@@ -1,5 +1,4 @@
 import { css } from '@emotion/css';
-import { cloneDeep } from 'lodash';
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -10,8 +9,6 @@ import { contextSrv } from 'app/core/core';
 import { useSelector } from 'app/types';
 
 import { Branding } from '../../Branding/Branding';
-import { enrichHelpItem } from '../MegaMenu/utils';
-import { NewsContainer } from '../News/NewsContainer';
 import { OrganizationSwitcher } from '../OrganizationSwitcher/OrganizationSwitcher';
 import { QuickAdd } from '../QuickAdd/QuickAdd';
 import { TOP_BAR_LEVEL_HEIGHT } from '../types';
@@ -25,9 +22,6 @@ export const TopSearchBar = React.memo(function TopSearchBar() {
   const styles = useStyles2(getStyles);
   const navIndex = useSelector((state) => state.navIndex);
   const location = useLocation();
-
-  const helpNode = cloneDeep(navIndex['help']);
-  const enrichedHelpNode = helpNode ? enrichHelpItem(helpNode) : undefined;
   const profileNode = navIndex['profile'];
 
   let homeUrl = config.appSubUrl || '/';
@@ -50,12 +44,6 @@ export const TopSearchBar = React.memo(function TopSearchBar() {
 
       <TopSearchBarSection align="right">
         <QuickAdd />
-        {enrichedHelpNode && (
-          <Dropdown overlay={() => <TopNavBarMenu node={enrichedHelpNode} />} placement="bottom-end">
-            <ToolbarButton iconOnly icon="question-circle" aria-label="Help" />
-          </Dropdown>
-        )}
-        {config.newsFeedEnabled && <NewsContainer />}
         {!contextSrv.user.isSignedIn && <SignInLink />}
         {profileNode && (
           <Dropdown overlay={() => <TopNavBarMenu node={profileNode} />} placement="bottom-end">
@@ -74,7 +62,7 @@ export const TopSearchBar = React.memo(function TopSearchBar() {
 
 const getStyles = (theme: GrafanaTheme2) => ({
   layout: css({
-    height: TOP_BAR_LEVEL_HEIGHT,
+    height: TOP_BAR_LEVEL_HEIGHT * 2,
     display: 'flex',
     gap: theme.spacing(1),
     alignItems: 'center',
@@ -90,8 +78,8 @@ const getStyles = (theme: GrafanaTheme2) => ({
     },
   }),
   img: css({
-    height: theme.spacing(3),
-    width: theme.spacing(3),
+    height: theme.spacing(10),
+    width: theme.spacing(10),
   }),
   logo: css({
     display: 'flex',

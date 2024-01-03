@@ -3,7 +3,6 @@ import React from 'react';
 import { LinkTarget } from '@grafana/data';
 import { config } from '@grafana/runtime';
 import { Icon, IconName } from '@grafana/ui';
-import { t } from 'app/core/internationalization';
 
 export interface FooterLink {
   target: LinkTarget;
@@ -17,24 +16,21 @@ export let getFooterLinks = (): FooterLink[] => {
   return [
     {
       target: '_blank',
-      id: 'documentation',
-      text: t('nav.help/documentation', 'Documentation'),
-      icon: 'document-info',
-      url: 'https://grafana.com/docs/grafana/latest/?utm_source=grafana_footer',
+      id: 'adftech',
+      text: 'ADF Technologies',
+      url: 'https://www.adftech.com.my/',
     },
     {
       target: '_blank',
-      id: 'support',
-      text: t('nav.help/support', 'Support'),
-      icon: 'question-circle',
-      url: 'https://grafana.com/products/enterprise/?utm_source=grafana_footer',
+      id: 'email',
+      text: 'Email Us',
+      url: 'mailto:sales@adftech.com.my',
     },
     {
       target: '_blank',
-      id: 'community',
-      text: t('nav.help/community', 'Community'),
-      icon: 'comments-alt',
-      url: 'https://community.grafana.com/?utm_source=grafana_footer',
+      id: 'whatsapp',
+      text: 'WhatsApp Us',
+      url: 'https://api.whatsapp.com/send/?phone=60175521163&text&type=phone_number&app_absent=0',
     },
   ];
 };
@@ -53,14 +49,16 @@ export function getVersionLinks(hideEdition?: boolean): FooterLink[] {
   const links: FooterLink[] = [];
   const stateInfo = licenseInfo.stateInfo ? ` (${licenseInfo.stateInfo})` : '';
 
-  if (!hideEdition) {
-    links.push({
-      target: '_blank',
-      id: 'license',
-      text: `${buildInfo.edition}${stateInfo}`,
-      url: licenseInfo.licenseUrl,
-    });
+  if (hideEdition) {
+    return links;
   }
+
+  links.push({
+    target: '_blank',
+    id: 'license',
+    text: `${buildInfo.edition}${stateInfo}`,
+    url: licenseInfo.licenseUrl,
+  });
 
   if (buildInfo.hideVersion) {
     return links;
