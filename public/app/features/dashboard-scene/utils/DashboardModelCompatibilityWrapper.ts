@@ -4,20 +4,18 @@ import { AnnotationQuery, DashboardCursorSync, dateTimeFormat, DateTimeInput, Ev
 import { TimeRangeUpdatedEvent } from '@grafana/runtime';
 import {
   behaviors,
-  SceneDataLayers,
+  SceneDataTransformer,
   sceneGraph,
   SceneGridItem,
   SceneGridLayout,
   SceneGridRow,
-  SceneObject,
   VizPanel,
 } from '@grafana/scenes';
 
 import { DashboardScene } from '../scene/DashboardScene';
-import { dataLayersToAnnotations } from '../serialization/dataLayersToAnnotations';
 
-import { PanelModelCompatibilityWrapper } from './PanelModelCompatibilityWrapper';
-import { findVizPanelByKey, getVizPanelKeyForPanelId } from './utils';
+import { dashboardSceneGraph } from './dashboardSceneGraph';
+import { findVizPanelByKey, getPanelIdForVizPanel, getVizPanelKeyForPanelId } from './utils';
 
 /**
  * Will move this to make it the main way we remain somewhat compatible with getDashboardSrv().getCurrent
@@ -28,9 +26,6 @@ export class DashboardModelCompatibilityWrapper {
 
   public constructor(private _scene: DashboardScene) {
     const timeRange = sceneGraph.getTimeRange(_scene);
-
-    // Copied from DashboardModel, as this function is passed around
-    this.formatDate = this.formatDate.bind(this);
 
     this._subs.add(
       timeRange.subscribeToState((state, prev) => {
@@ -67,8 +62,8 @@ export class DashboardModelCompatibilityWrapper {
 
   public get timepicker() {
     return {
-      refresh_intervals: this._scene.state.controls!.state.refreshPicker.state.intervals,
-      hidden: this._scene.state.controls!.state.hideTimeControls ?? false,
+      refresh_intervals: dashboardSceneGraph.getRefreshPicker(this._scene)?.state.intervals,
+      hidden: dashboardSceneGraph.getDashboardControls(this._scene)?.state.hideTimeControls ?? false,
     };
   }
 
@@ -84,10 +79,6 @@ export class DashboardModelCompatibilityWrapper {
     return this._scene.state.tags;
   }
 
-  public get links() {
-    return this._scene.state.links;
-  }
-
   public get meta() {
     return this._scene.state.meta;
   }
@@ -100,24 +91,12 @@ export class DashboardModelCompatibilityWrapper {
     };
   }
 
-  public get panels() {
-    const panels = findAllObjects(this._scene, (o) => {
-      return Boolean(o instanceof VizPanel);
-    });
-    return panels.map((p) => new PanelModelCompatibilityWrapper(p as VizPanel));
-  }
-
   /**
    * Used from from timeseries migration handler to migrate time regions to dashboard annotations
    */
   public get annotations(): { list: AnnotationQuery[] } {
-    const annotations: { list: AnnotationQuery[] } = { list: [] };
-
-    if (this._scene.state.$data instanceof SceneDataLayers) {
-      annotations.list = dataLayersToAnnotations(this._scene.state.$data.state.layers);
-    }
-
-    return annotations;
+    console.error('Scenes DashboardModelCompatibilityWrapper.annotations not implemented (yet)');
+    return { list: [] };
   }
 
   public getTimezone() {
@@ -156,10 +135,10 @@ export class DashboardModelCompatibilityWrapper {
     });
   }
 
-  public getPanelById(id: number): PanelModelCompatibilityWrapper | null {
+  public getPanelById(id: number): PanelCompatibilityWrapper | null {
     const vizPanel = findVizPanelByKey(this._scene, getVizPanelKeyForPanelId(id));
     if (vizPanel) {
-      return new PanelModelCompatibilityWrapper(vizPanel);
+      return new PanelCompatibilityWrapper(vizPanel);
     }
 
     return null;
@@ -168,7 +147,7 @@ export class DashboardModelCompatibilityWrapper {
   /**
    * Mainly implemented to support Getting started panel's dissmis button.
    */
-  public removePanel(panel: PanelModelCompatibilityWrapper) {
+  public removePanel(panel: PanelCompatibilityWrapper) {
     const vizPanel = findVizPanelByKey(this._scene, getVizPanelKeyForPanelId(panel.id));
     if (!vizPanel) {
       console.error('Trying to remove a panel that was not found in scene', panel);
@@ -211,15 +190,8 @@ export class DashboardModelCompatibilityWrapper {
   }
 
   public canEditAnnotations(dashboardUID?: string) {
-    if (!this._scene.canEditDashboard()) {
-      return false;
-    }
-
-    if (dashboardUID) {
-      return Boolean(this._scene.state.meta.annotationsPermissions?.dashboard.canEdit);
-    }
-
-    return Boolean(this._scene.state.meta.annotationsPermissions?.organization.canEdit);
+    // TOOD
+    return false;
   }
 
   public panelInitialized() {}
@@ -228,21 +200,47 @@ export class DashboardModelCompatibilityWrapper {
     this.events.removeAllListeners();
     this._subs.unsubscribe();
   }
-
-  public hasUnsavedChanges() {
-    return this._scene.state.isDirty;
-  }
 }
 
-function findAllObjects(root: SceneObject, check: (o: SceneObject) => boolean) {
-  let result: SceneObject[] = [];
-  root.forEachChild((child) => {
-    if (check(child)) {
-      result.push(child);
-    } else {
-      result = result.concat(findAllObjects(child, check));
-    }
-  });
+class PanelCompatibilityWrapper {
+  constructor(private _vizPanel: VizPanel) {}
 
-  return result;
+  public get id() {
+    const id = getPanelIdForVizPanel(this._vizPanel);
+
+    if (isNaN(id)) {
+      console.error('VizPanel key could not be translated to a legacy numeric panel id', this._vizPanel);
+      return 0;
+    }
+
+    return id;
+  }
+
+  public get type() {
+    return this._vizPanel.state.pluginId;
+  }
+
+  public get title() {
+    return this._vizPanel.state.title;
+  }
+
+  public get transformations() {
+    if (this._vizPanel.state.$data instanceof SceneDataTransformer) {
+      return this._vizPanel.state.$data.state.transformations;
+    }
+
+    return [];
+  }
+
+  public refresh() {
+    console.error('Scenes PanelCompatibilityWrapper.refresh no implemented (yet)');
+  }
+
+  public render() {
+    console.error('Scenes PanelCompatibilityWrapper.render no implemented (yet)');
+  }
+
+  public getQueryRunner() {
+    console.error('Scenes PanelCompatibilityWrapper.getQueryRunner no implemented (yet)');
+  }
 }

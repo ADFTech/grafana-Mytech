@@ -11,7 +11,7 @@ import (
 )
 
 type NotificationPolicyService struct {
-	configStore     *alertmanagerConfigStoreImpl
+	amStore         AMConfigStore
 	provenanceStore ProvisioningStore
 	xact            TransactionManager
 	log             log.Logger
@@ -21,7 +21,7 @@ type NotificationPolicyService struct {
 func NewNotificationPolicyService(am AMConfigStore, prov ProvisioningStore,
 	xact TransactionManager, settings setting.UnifiedAlertingSettings, log log.Logger) *NotificationPolicyService {
 	return &NotificationPolicyService{
-		configStore:     &alertmanagerConfigStoreImpl{store: am},
+		amStore:         am,
 		provenanceStore: prov,
 		xact:            xact,
 		log:             log,
@@ -30,25 +30,30 @@ func NewNotificationPolicyService(am AMConfigStore, prov ProvisioningStore,
 }
 
 func (nps *NotificationPolicyService) GetAMConfigStore() AMConfigStore {
-	return nps.configStore.store
+	return nps.amStore
 }
 
 func (nps *NotificationPolicyService) GetPolicyTree(ctx context.Context, orgID int64) (definitions.Route, error) {
-	rev, err := nps.configStore.Get(ctx, orgID)
+	alertManagerConfig, err := nps.amStore.GetLatestAlertmanagerConfiguration(ctx, orgID)
 	if err != nil {
 		return definitions.Route{}, err
 	}
 
-	if rev.cfg.AlertmanagerConfig.Config.Route == nil {
+	cfg, err := deserializeAlertmanagerConfig([]byte(alertManagerConfig.AlertmanagerConfiguration))
+	if err != nil {
+		return definitions.Route{}, err
+	}
+
+	if cfg.AlertmanagerConfig.Config.Route == nil {
 		return definitions.Route{}, fmt.Errorf("no route present in current alertmanager config")
 	}
 
-	provenance, err := nps.provenanceStore.GetProvenance(ctx, rev.cfg.AlertmanagerConfig.Route, orgID)
+	provenance, err := nps.provenanceStore.GetProvenance(ctx, cfg.AlertmanagerConfig.Route, orgID)
 	if err != nil {
 		return definitions.Route{}, err
 	}
 
-	result := *rev.cfg.AlertmanagerConfig.Route
+	result := *cfg.AlertmanagerConfig.Route
 	result.Provenance = definitions.Provenance(provenance)
 
 	return result, nil
@@ -60,7 +65,7 @@ func (nps *NotificationPolicyService) UpdatePolicyTree(ctx context.Context, orgI
 		return fmt.Errorf("%w: %s", ErrValidation, err.Error())
 	}
 
-	revision, err := nps.configStore.Get(ctx, orgID)
+	revision, err := getLastConfiguration(ctx, orgID, nps.amStore)
 	if err != nil {
 		return err
 	}
@@ -86,12 +91,33 @@ func (nps *NotificationPolicyService) UpdatePolicyTree(ctx context.Context, orgI
 
 	revision.cfg.AlertmanagerConfig.Config.Route = &tree
 
-	return nps.xact.InTransaction(ctx, func(ctx context.Context) error {
-		if err := nps.configStore.Save(ctx, revision, orgID); err != nil {
+	serialized, err := serializeAlertmanagerConfig(*revision.cfg)
+	if err != nil {
+		return err
+	}
+	cmd := models.SaveAlertmanagerConfigurationCmd{
+		AlertmanagerConfiguration: string(serialized),
+		ConfigurationVersion:      revision.version,
+		FetchedConfigurationHash:  revision.concurrencyToken,
+		Default:                   false,
+		OrgID:                     orgID,
+	}
+	err = nps.xact.InTransaction(ctx, func(ctx context.Context) error {
+		err = PersistConfig(ctx, nps.amStore, &cmd)
+		if err != nil {
 			return err
 		}
-		return nps.provenanceStore.SetProvenance(ctx, &tree, orgID, p)
+		err = nps.provenanceStore.SetProvenance(ctx, &tree, orgID, p)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (nps *NotificationPolicyService) ResetPolicyTree(ctx context.Context, orgID int64) (definitions.Route, error) {
@@ -102,7 +128,7 @@ func (nps *NotificationPolicyService) ResetPolicyTree(ctx context.Context, orgID
 	}
 	route := defaultCfg.AlertmanagerConfig.Route
 
-	revision, err := nps.configStore.Get(ctx, orgID)
+	revision, err := getLastConfiguration(ctx, orgID, nps.amStore)
 	if err != nil {
 		return definitions.Route{}, err
 	}
@@ -112,16 +138,31 @@ func (nps *NotificationPolicyService) ResetPolicyTree(ctx context.Context, orgID
 		return definitions.Route{}, err
 	}
 
+	serialized, err := serializeAlertmanagerConfig(*revision.cfg)
+	if err != nil {
+		return definitions.Route{}, err
+	}
+	cmd := models.SaveAlertmanagerConfigurationCmd{
+		AlertmanagerConfiguration: string(serialized),
+		ConfigurationVersion:      revision.version,
+		FetchedConfigurationHash:  revision.concurrencyToken,
+		Default:                   false,
+		OrgID:                     orgID,
+	}
 	err = nps.xact.InTransaction(ctx, func(ctx context.Context) error {
-		if err := nps.configStore.Save(ctx, revision, orgID); err != nil {
+		err := PersistConfig(ctx, nps.amStore, &cmd)
+		if err != nil {
 			return err
 		}
-		return nps.provenanceStore.DeleteProvenance(ctx, route, orgID)
+		err = nps.provenanceStore.DeleteProvenance(ctx, route, orgID)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
-
 	if err != nil {
 		return definitions.Route{}, nil
-	} // TODO should be error?
+	}
 
 	return *route, nil
 }

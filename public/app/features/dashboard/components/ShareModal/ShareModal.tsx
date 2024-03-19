@@ -59,7 +59,7 @@ function getTabs(panel?: PanelModel, activeTab?: string) {
 
   if (isPublicDashboardsEnabled()) {
     tabs.push({
-      label: t('share-modal.tab-title.public-dashboard-title', 'Public dashboard'),
+      label: 'Public dashboard',
       value: shareDashboardType.publicDashboard,
       component: SharePublicDashboard,
     });
@@ -77,6 +77,7 @@ interface Props extends Themeable2 {
   dashboard: DashboardModel;
   panel?: PanelModel;
   activeTab?: string;
+
   onDismiss(): void;
 }
 

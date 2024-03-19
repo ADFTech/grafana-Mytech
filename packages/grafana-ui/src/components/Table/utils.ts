@@ -28,7 +28,6 @@ import {
 } from '@grafana/schema';
 
 import { BarGaugeCell } from './BarGaugeCell';
-import { DataLinksCell } from './DataLinksCell';
 import { DefaultCell } from './DefaultCell';
 import { getFooterValue } from './FooterRow';
 import { GeoCell } from './GeoCell';
@@ -184,8 +183,6 @@ export function getCellComponent(displayMode: TableCellDisplayMode, field: Field
       return SparklineCell;
     case TableCellDisplayMode.JSONView:
       return JSONViewCell;
-    case TableCellDisplayMode.DataLinks:
-      return DataLinksCell;
   }
 
   if (field.type === FieldType.geo) {
@@ -385,25 +382,10 @@ export function getFooterItems(
 }
 
 function getFormattedValue(field: Field, reducer: string[], theme: GrafanaTheme2) {
-  // If we don't have anything to return then we display nothing
+  const fmt = field.display ?? getDisplayProcessor({ field, theme });
   const calc = reducer[0];
-  if (calc === undefined) {
-    return '';
-  }
-
-  // Calculate the reduction
-  const format = field.display ?? getDisplayProcessor({ field, theme });
-  const fieldCalcValue = reduceField({ field, reducers: reducer })[calc];
-
-  // If the reducer preserves units then format the
-  // end value with the field display processor
-  const reducerInfo = fieldReducers.get(calc);
-  if (reducerInfo.preservesUnits) {
-    return formattedValueToString(format(fieldCalcValue));
-  }
-
-  // Otherwise we simply return the formatted string
-  return formattedValueToString({ text: fieldCalcValue });
+  const v = reduceField({ field, reducers: reducer })[calc];
+  return formattedValueToString(fmt(v));
 }
 
 // This strips the raw vales from the `rows` object.

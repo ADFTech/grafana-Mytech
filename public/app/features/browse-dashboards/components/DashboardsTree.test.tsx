@@ -5,14 +5,8 @@ import { TestProvider } from 'test/helpers/TestProvider';
 import { assertIsDefined } from 'test/helpers/asserts';
 
 import { selectors } from '@grafana/e2e-selectors';
-import { config } from '@grafana/runtime';
 
-import {
-  sharedWithMeFolder,
-  wellFormedDashboard,
-  wellFormedEmptyFolder,
-  wellFormedFolder,
-} from '../fixtures/dashboardsTreeItem.fixture';
+import { wellFormedDashboard, wellFormedEmptyFolder, wellFormedFolder } from '../fixtures/dashboardsTreeItem.fixture';
 import { SelectionState } from '../types';
 
 import { DashboardsTree } from './DashboardsTree';
@@ -32,10 +26,6 @@ describe('browse-dashboards DashboardsTree', () => {
   const isSelected = () => SelectionState.Unselected;
   const allItemsAreLoaded = () => true;
   const requestLoadMore = () => Promise.resolve();
-
-  beforeAll(() => {
-    config.sharedWithMeFolderUID = 'sharedwithme';
-  });
 
   it('renders a dashboard item', () => {
     render(
@@ -92,71 +82,7 @@ describe('browse-dashboards DashboardsTree', () => {
         requestLoadMore={requestLoadMore}
       />
     );
-
     expect(screen.queryByText(folder.item.title)).toBeInTheDocument();
-  });
-
-  it('renders a folder link', () => {
-    render(
-      <DashboardsTree
-        canSelect
-        items={[folder]}
-        isSelected={isSelected}
-        width={WIDTH}
-        height={HEIGHT}
-        onFolderClick={noop}
-        onItemSelectionChange={noop}
-        onAllSelectionChange={noop}
-        isItemLoaded={allItemsAreLoaded}
-        requestLoadMore={requestLoadMore}
-      />
-    );
-
-    expect(screen.queryByText(folder.item.title)).toHaveAttribute('href', folder.item.url);
-  });
-
-  it("doesn't link to the sharedwithme pseudo-folder", () => {
-    const sharedWithMe = sharedWithMeFolder(2);
-
-    render(
-      <DashboardsTree
-        canSelect
-        items={[sharedWithMe, folder]}
-        isSelected={isSelected}
-        width={WIDTH}
-        height={HEIGHT}
-        onFolderClick={noop}
-        onItemSelectionChange={noop}
-        onAllSelectionChange={noop}
-        isItemLoaded={allItemsAreLoaded}
-        requestLoadMore={requestLoadMore}
-      />
-    );
-
-    expect(screen.queryByText(sharedWithMe.item.title)).not.toHaveAttribute('href');
-  });
-
-  it("doesn't render a checkbox for the sharedwithme pseudo-folder", () => {
-    const sharedWithMe = sharedWithMeFolder(2);
-
-    render(
-      <DashboardsTree
-        canSelect
-        items={[sharedWithMe, folder]}
-        isSelected={isSelected}
-        width={WIDTH}
-        height={HEIGHT}
-        onFolderClick={noop}
-        onItemSelectionChange={noop}
-        onAllSelectionChange={noop}
-        isItemLoaded={allItemsAreLoaded}
-        requestLoadMore={requestLoadMore}
-      />
-    );
-
-    expect(
-      screen.queryByTestId(selectors.pages.BrowseDashboards.table.checkbox(sharedWithMe.item.uid))
-    ).not.toBeInTheDocument();
   });
 
   it('calls onFolderClick when a folder button is clicked', async () => {

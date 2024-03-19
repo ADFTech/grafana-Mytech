@@ -65,14 +65,6 @@ export function wellFormedFolder(
   };
 }
 
-export function sharedWithMeFolder(seed = 1): DashboardsTreeItem<DashboardViewItem> {
-  const folder = wellFormedFolder(seed, undefined, {
-    uid: 'sharedwithme',
-    url: undefined,
-  });
-  return folder;
-}
-
 export function wellFormedTree() {
   let seed = 1;
 

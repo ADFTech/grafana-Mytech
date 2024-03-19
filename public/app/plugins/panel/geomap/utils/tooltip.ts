@@ -62,7 +62,7 @@ export const pointerMoveListener = (evt: MapBrowserEvent<MouseEvent>, panel: Geo
   panel.map.forEachFeatureAtPixel(
     pixel,
     (feature, layer, geo) => {
-      const s = getMapLayerState(layer);
+      const s: MapLayerState = getMapLayerState(layer);
       //match hover layer to layer in layers
       //check if the layer show tooltip is enabled
       //then also pass the list of tooltip fields if exists

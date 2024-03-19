@@ -38,7 +38,6 @@ type RenderingService struct {
 	version           string
 	versionMutex      sync.RWMutex
 	capabilities      []Capability
-	pluginAvailable   bool
 
 	perRequestRenderKeyProvider renderKeyProvider
 	Cfg                         *setting.Cfg
@@ -58,18 +57,16 @@ type Plugin interface {
 }
 
 func ProvideService(cfg *setting.Cfg, features *featuremgmt.FeatureManager, remoteCache *remotecache.RemoteCache, rm PluginManager) (*RenderingService, error) {
-	folders := []string{
-		cfg.ImagesDir,
-		cfg.CSVsDir,
-		cfg.PDFsDir,
+	// ensure ImagesDir exists
+	err := os.MkdirAll(cfg.ImagesDir, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create images directory %q: %w", cfg.ImagesDir, err)
 	}
 
-	// ensure folders exists
-	for _, f := range folders {
-		err := os.MkdirAll(f, 0700)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create directory %q: %w", f, err)
-		}
+	// ensure CSVsDir exists
+	err = os.MkdirAll(cfg.CSVsDir, 0700)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create CSVs directory %q: %w", cfg.CSVsDir, err)
 	}
 
 	logger := log.New("rendering")
@@ -111,8 +108,6 @@ func ProvideService(cfg *setting.Cfg, features *featuremgmt.FeatureManager, remo
 		}
 	}
 
-	_, exists := rm.Renderer(context.Background())
-
 	s := &RenderingService{
 		perRequestRenderKeyProvider: renderKeyProvider,
 		capabilities: []Capability{
@@ -136,7 +131,6 @@ func ProvideService(cfg *setting.Cfg, features *featuremgmt.FeatureManager, remo
 		log:                   logger,
 		domain:                domain,
 		sanitizeURL:           sanitizeURL,
-		pluginAvailable:       exists,
 	}
 
 	gob.Register(&RenderUser{})
@@ -206,12 +200,17 @@ func (rs *RenderingService) Run(ctx context.Context) error {
 	return nil
 }
 
+func (rs *RenderingService) pluginAvailable(ctx context.Context) bool {
+	_, exists := rs.RendererPluginManager.Renderer(ctx)
+	return exists
+}
+
 func (rs *RenderingService) remoteAvailable() bool {
 	return rs.Cfg.RendererUrl != ""
 }
 
 func (rs *RenderingService) IsAvailable(ctx context.Context) bool {
-	return rs.remoteAvailable() || rs.pluginAvailable
+	return rs.remoteAvailable() || rs.pluginAvailable(ctx)
 }
 
 func (rs *RenderingService) Version() string {
@@ -246,18 +245,18 @@ func (rs *RenderingService) renderUnavailableImage() *RenderResult {
 	imgPath := "public/img/rendering_plugin_not_installed.png"
 
 	return &RenderResult{
-		FilePath: filepath.Join(rs.Cfg.HomePath, imgPath),
+		FilePath: filepath.Join(setting.HomePath, imgPath),
 	}
 }
 
-func (rs *RenderingService) Render(ctx context.Context, renderType RenderType, opts Opts, session Session) (*RenderResult, error) {
+func (rs *RenderingService) Render(ctx context.Context, opts Opts, session Session) (*RenderResult, error) {
 	startTime := time.Now()
 
 	renderKeyProvider := rs.perRequestRenderKeyProvider
 	if session != nil {
 		renderKeyProvider = session
 	}
-	result, err := rs.render(ctx, renderType, opts, renderKeyProvider)
+	result, err := rs.render(ctx, opts, renderKeyProvider)
 
 	elapsedTime := time.Since(startTime).Milliseconds()
 	saveMetrics(elapsedTime, err, RenderPNG)
@@ -265,7 +264,7 @@ func (rs *RenderingService) Render(ctx context.Context, renderType RenderType, o
 	return result, err
 }
 
-func (rs *RenderingService) render(ctx context.Context, renderType RenderType, opts Opts, renderKeyProvider renderKeyProvider) (*RenderResult, error) {
+func (rs *RenderingService) render(ctx context.Context, opts Opts, renderKeyProvider renderKeyProvider) (*RenderResult, error) {
 	if int(atomic.LoadInt32(&rs.inProgressCount)) > opts.ConcurrentLimit {
 		rs.log.Warn("Could not render image, hit the currency limit", "concurrencyLimit", opts.ConcurrentLimit, "path", opts.Path)
 		if opts.ErrorConcurrentLimitReached {
@@ -308,7 +307,7 @@ func (rs *RenderingService) render(ctx context.Context, renderType RenderType, o
 	}()
 
 	metrics.MRenderingQueue.Set(float64(atomic.AddInt32(&rs.inProgressCount, 1)))
-	return rs.renderAction(ctx, renderType, renderKey, opts)
+	return rs.renderAction(ctx, renderKey, opts)
 }
 
 func (rs *RenderingService) RenderCSV(ctx context.Context, opts CSVOpts, session Session) (*RenderCSVResult, error) {
@@ -375,18 +374,11 @@ func (rs *RenderingService) getNewFilePath(rt RenderType) (string, error) {
 		return "", err
 	}
 
-	var ext string
-	var folder string
-	switch rt {
-	case RenderCSV:
+	ext := "png"
+	folder := rs.Cfg.ImagesDir
+	if rt == RenderCSV {
 		ext = "csv"
 		folder = rs.Cfg.CSVsDir
-	case RenderPDF:
-		ext = "pdf"
-		folder = rs.Cfg.PDFsDir
-	default:
-		ext = "png"
-		folder = rs.Cfg.ImagesDir
 	}
 
 	return filepath.Abs(filepath.Join(folder, fmt.Sprintf("%s.%s", rand, ext)))

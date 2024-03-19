@@ -1,8 +1,6 @@
 import { reportInteraction } from '@grafana/runtime';
 import { InspectTab } from 'app/features/inspector/types';
 
-let isScenesContextSet = false;
-
 export const DashboardInteractions = {
   // Dashboard interactions:
   dashboardInitialized: (properties?: Record<string, unknown>) => {
@@ -135,27 +133,15 @@ export const DashboardInteractions = {
   toolbarSaveClick: () => {
     reportDashboardInteraction('toolbar_actions_clicked', { item: 'save' });
   },
-  toolbarSaveAsClick: () => {
-    reportDashboardInteraction('toolbar_actions_clicked', { item: 'save_as' });
-  },
+
   toolbarAddClick: () => {
     reportDashboardInteraction('toolbar_actions_clicked', { item: 'add' });
-  },
-
-  setScenesContext: () => {
-    isScenesContextSet = true;
-
-    return () => {
-      isScenesContextSet = false;
-    };
   },
 };
 
 const reportDashboardInteraction: typeof reportInteraction = (name, properties) => {
-  const meta = isScenesContextSet ? { scenesView: true } : {};
-
   if (properties) {
-    reportInteraction(`dashboards_${name}`, { ...properties, ...meta });
+    reportInteraction(`dashboards_${name}`, properties);
   } else {
     reportInteraction(`dashboards_${name}`);
   }

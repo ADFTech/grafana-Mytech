@@ -41,15 +41,10 @@ export const getPluginLinkExtensions: GetPluginExtensions<PluginExtensionLink> =
   };
 };
 
-// This getter doesn't support the `context` option (contextual information can be passed in as component props)
-export const getPluginComponentExtensions = <Props = {}>(options: {
-  extensionPointId: string;
-  limitPerPlugin?: number;
-}): { extensions: Array<PluginExtensionComponent<Props>> } => {
+export const getPluginComponentExtensions: GetPluginExtensions<PluginExtensionComponent> = (options) => {
   const { extensions } = getPluginExtensions(options);
-  const componentExtensions = extensions.filter(isPluginExtensionComponent) as Array<PluginExtensionComponent<Props>>;
 
   return {
-    extensions: componentExtensions,
+    extensions: extensions.filter(isPluginExtensionComponent),
   };
 };

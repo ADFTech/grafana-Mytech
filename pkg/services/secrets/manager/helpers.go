@@ -23,9 +23,12 @@ func SetupDisabledTestService(tb testing.TB, store secrets.Store) *SecretsServic
 	return setupTestService(tb, store, featuremgmt.WithFeatures(featuremgmt.FlagDisableEnvelopeEncryption))
 }
 
-func setupTestService(tb testing.TB, store secrets.Store, features featuremgmt.FeatureToggles) *SecretsService {
+func setupTestService(tb testing.TB, store secrets.Store, features *featuremgmt.FeatureManager) *SecretsService {
 	tb.Helper()
 	defaultKey := "SdlklWklckeLS"
+	if len(setting.SecretKey) > 0 {
+		defaultKey = setting.SecretKey
+	}
 	raw, err := ini.Load([]byte(`
 		[security]
 		secret_key = ` + defaultKey + `

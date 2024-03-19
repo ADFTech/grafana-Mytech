@@ -4,32 +4,45 @@ import pluralize from 'pluralize';
 import React, { useCallback, useMemo } from 'react';
 import { useAsync } from 'react-use';
 
-import { DataQuery, GrafanaTheme2, SelectableValue, DataTopic, QueryEditorProps } from '@grafana/data';
-import { Field, Select, useStyles2, Spinner, RadioButtonGroup, Stack, InlineSwitch } from '@grafana/ui';
+import { DataQuery, GrafanaTheme2, PanelData, SelectableValue, DataTopic } from '@grafana/data';
+import {
+  Card,
+  Field,
+  Select,
+  useStyles2,
+  VerticalGroup,
+  HorizontalGroup,
+  Spinner,
+  Switch,
+  RadioButtonGroup,
+} from '@grafana/ui';
 import config from 'app/core/config';
 import { getDashboardSrv } from 'app/features/dashboard/services/DashboardSrv';
 import { PanelModel } from 'app/features/dashboard/state';
 import { getDatasourceSrv } from 'app/features/plugins/datasource_srv';
 import { filterPanelDataToQuery } from 'app/features/query/components/QueryEditorRow';
 
-import { OperationsEditorRow } from '../prometheus/querybuilder/shared/OperationsEditorRow';
-
-import { DashboardDatasource } from './datasource';
 import { DashboardQuery, ResultInfo, SHARED_DASHBOARD_QUERY } from './types';
 
 function getQueryDisplayText(query: DataQuery): string {
   return JSON.stringify(query);
 }
 
-interface Props extends QueryEditorProps<DashboardDatasource, DashboardQuery> {}
+interface Props {
+  queries: DataQuery[];
+  panelData: PanelData;
+  onChange: (queries: DataQuery[]) => void;
+  onRunQueries: () => void;
+}
 
 const topics = [
   { label: 'All data', value: false },
   { label: 'Annotations', value: true, description: 'Include annotations as regular data' },
 ];
 
-export function DashboardQueryEditor({ data, query, onChange, onRunQuery }: Props) {
+export function DashboardQueryEditor({ panelData, queries, onChange, onRunQueries }: Props) {
   const { value: defaultDatasource } = useAsync(() => getDatasourceSrv().get());
+  const query = queries[0] as DashboardQuery;
 
   const panel = useMemo(() => {
     const dashboard = getDashboardSrv().getCurrent();
@@ -37,7 +50,7 @@ export function DashboardQueryEditor({ data, query, onChange, onRunQuery }: Prop
   }, [query.panelId]);
 
   const { value: results, loading: loadingResults } = useAsync(async (): Promise<ResultInfo[]> => {
-    if (!panel || !data) {
+    if (!panel) {
       return [];
     }
     const mainDS = await getDatasourceSrv().get(panel.datasource);
@@ -45,7 +58,7 @@ export function DashboardQueryEditor({ data, query, onChange, onRunQuery }: Prop
       panel.targets.map(async (query) => {
         const ds = query.datasource ? await getDatasourceSrv().get(query.datasource) : mainDS;
         const fmt = ds.getQueryDisplayText || getQueryDisplayText;
-        const queryData = filterPanelDataToQuery(data, query.refId) ?? data;
+        const queryData = filterPanelDataToQuery(panelData, query.refId) ?? panelData;
         return {
           refId: query.refId,
           query: fmt(query),
@@ -56,14 +69,14 @@ export function DashboardQueryEditor({ data, query, onChange, onRunQuery }: Prop
         };
       })
     );
-  }, [data, panel]);
+  }, [panelData, panel]);
 
   const onUpdateQuery = useCallback(
     (query: DashboardQuery) => {
-      onChange(query);
-      onRunQuery();
+      onChange([query]);
+      onRunQueries();
     },
-    [onChange, onRunQuery]
+    [onChange, onRunQueries]
   );
 
   const onPanelChanged = useCallback(
@@ -142,61 +155,64 @@ export function DashboardQueryEditor({ data, query, onChange, onRunQuery }: Prop
   const selected = panels.find((panel) => panel.value === query.panelId);
 
   return (
-    <OperationsEditorRow>
-      <Stack direction="column">
-        <Stack gap={3}>
-          <Field label="Source panel" description="Use query results from another panel">
-            <Select
-              inputId={selectId}
-              placeholder="Choose panel"
-              isSearchable={true}
-              options={panels}
-              value={selected}
-              onChange={(item) => onPanelChanged(item.value!)}
-            />
-          </Field>
+    <>
+      <Field label="Source" description="Use the same results as panel">
+        <Select
+          inputId={selectId}
+          placeholder="Choose panel"
+          isSearchable={true}
+          options={panels}
+          value={selected}
+          onChange={(item) => onPanelChanged(item.value!)}
+        />
+      </Field>
 
-          <Field label="Data" description="Use data or annotations from the panel">
-            <RadioButtonGroup
-              options={topics}
-              value={query.topic === DataTopic.Annotations}
-              onChange={onTopicChanged}
-            />
-          </Field>
+      <HorizontalGroup height="auto" wrap={true} align="flex-start">
+        <Field
+          label="Data Source"
+          description="Use data or annotations from the panel"
+          className={styles.horizontalField}
+        >
+          <RadioButtonGroup options={topics} value={query.topic === DataTopic.Annotations} onChange={onTopicChanged} />
+        </Field>
 
-          {showTransforms && (
-            <Field label="Transform" description="Apply transformations from the source panel">
-              <InlineSwitch value={Boolean(query.withTransforms)} onChange={onTransformToggle} />
+        {showTransforms && (
+          <Field label="Transform" description="Apply panel transformations from the source panel">
+            <Switch value={Boolean(query.withTransforms)} onChange={onTransformToggle} />
+          </Field>
+        )}
+      </HorizontalGroup>
+
+      {loadingResults ? (
+        <Spinner />
+      ) : (
+        <>
+          {results && Boolean(results.length) && (
+            <Field label="Queries from panel">
+              <VerticalGroup spacing="sm">
+                {results.map((target, i) => (
+                  <Card key={`DashboardQueryRow-${i}`}>
+                    <Card.Heading>{target.refId}</Card.Heading>
+                    <Card.Figure>
+                      <img src={target.img} alt={target.name} title={target.name} width={40} />
+                    </Card.Figure>
+                    <Card.Meta>{target.query}</Card.Meta>
+                  </Card>
+                ))}
+              </VerticalGroup>
             </Field>
           )}
-        </Stack>
-
-        {loadingResults ? (
-          <Spinner />
-        ) : (
-          <>
-            {results && Boolean(results.length) && (
-              <Field label="Queries from panel">
-                <Stack direction="column">
-                  {results.map((target, i) => (
-                    <Stack key={i} alignItems="center" gap={1}>
-                      <div>{target.refId}</div>
-                      <img src={target.img} alt={target.name} title={target.name} width={16} />
-                      <div>{target.query}</div>
-                    </Stack>
-                  ))}
-                </Stack>
-              </Field>
-            )}
-          </>
-        )}
-      </Stack>
-    </OperationsEditorRow>
+        </>
+      )}
+    </>
   );
 }
 
 function getStyles(theme: GrafanaTheme2) {
   return {
+    horizontalField: css({
+      marginRight: theme.spacing(2),
+    }),
     noQueriesText: css({
       padding: theme.spacing(1.25),
     }),

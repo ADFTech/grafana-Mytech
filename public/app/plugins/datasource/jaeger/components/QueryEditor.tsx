@@ -36,8 +36,6 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
     switch (query.queryType) {
       case 'search':
         return <SearchForm datasource={datasource} query={query} onChange={onChange} />;
-      case 'dependencyGraph':
-        return null;
       default:
         return (
           <InlineFieldRow>
@@ -81,7 +79,6 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
                 options={[
                   { value: 'search', label: 'Search' },
                   { value: undefined, label: 'TraceID' },
-                  { value: 'dependencyGraph', label: 'Dependency graph' },
                 ]}
                 value={query.queryType}
                 onChange={(v) =>
@@ -111,7 +108,7 @@ export function QueryEditor({ datasource, query, onChange, onRunQuery }: Props) 
 }
 
 const getStyles = () => ({
-  container: css({
-    width: '100%',
-  }),
+  container: css`
+    width: 100%;
+  `,
 });

@@ -95,9 +95,9 @@ export const plugin = new PanelPlugin<Options>(AnnoListPanel)
       });
   })
   // TODO, we should support this directly in the plugin infrastructure
-  .setPanelChangeHandler((panel: PanelModel<Options>, prevPluginId, prevOptions) => {
+  .setPanelChangeHandler((panel: PanelModel<Options>, prevPluginId: string, prevOptions: unknown) => {
     if (prevPluginId === 'ryantxu-annolist-panel') {
-      return prevOptions;
+      return prevOptions as Options;
     }
 
     return panel.options;

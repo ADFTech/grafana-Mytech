@@ -52,7 +52,7 @@ export class EventBusLoggerPanel extends PureComponent<Props, State> {
 
   eventObserver: PartialObserver<BusEvent> = {
     next: (event: BusEvent) => {
-      const origin: any = event.origin;
+      const origin = event.origin as any;
       this.history.add({
         key: counter++,
         type: event.type,

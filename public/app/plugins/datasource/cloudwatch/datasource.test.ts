@@ -21,7 +21,6 @@ import {
   MetricEditorMode,
   MetricQueryType,
 } from './types';
-import * as templateUtils from './utils/templateVariableUtils';
 
 describe('datasource', () => {
   beforeEach(() => {
@@ -179,6 +178,7 @@ describe('datasource', () => {
     it('should interpolate multi-value template variable for log group names in the query', async () => {
       const { datasource, queryMock } = setupMockedDataSource({
         variables: [fieldsVariable, logGroupNamesVariable, regionVariable],
+        mockGetVariableName: false,
       });
       await lastValueFrom(
         datasource
@@ -304,9 +304,7 @@ describe('datasource', () => {
     it('should replace correct variables in CloudWatchMetricsQuery', () => {
       const { datasource, templateService } = setupMockedDataSource();
       templateService.replace = jest.fn();
-      const mockGetVariableName = jest
-        .spyOn(templateUtils, 'getVariableName')
-        .mockImplementation((name: string) => name.replace('$', ''));
+      templateService.getVariableName = jest.fn();
       const variableName = 'someVar';
       const metricsQuery: CloudWatchMetricsQuery = {
         queryMode: 'Metrics',
@@ -332,8 +330,8 @@ describe('datasource', () => {
       expect(templateService.replace).toHaveBeenCalledWith(`$${variableName}`, {});
       expect(templateService.replace).toHaveBeenCalledTimes(8);
 
-      expect(mockGetVariableName).toHaveBeenCalledWith(`$${variableName}`);
-      expect(mockGetVariableName).toHaveBeenCalledTimes(1);
+      expect(templateService.getVariableName).toHaveBeenCalledWith(`$${variableName}`);
+      expect(templateService.getVariableName).toHaveBeenCalledTimes(1);
     });
   });
 

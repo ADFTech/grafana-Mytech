@@ -69,7 +69,7 @@ export function getVersionLinks(hideEdition?: boolean): FooterLink[] {
   links.push({
     target: '_blank',
     id: 'version',
-    text: buildInfo.versionString,
+    text: `v${buildInfo.version} (${buildInfo.commit})`,
     url: hasReleaseNotes ? `https://github.com/grafana/grafana/blob/main/CHANGELOG.md` : undefined,
   });
 
@@ -103,8 +103,8 @@ export const Footer = React.memo(({ customLinks, hideEdition }: Props) => {
     <footer className="footer">
       <div className="text-center">
         <ul>
-          {links.map((link, index) => (
-            <li key={index}>
+          {links.map((link) => (
+            <li key={link.text}>
               <FooterItem item={link} />
             </li>
           ))}

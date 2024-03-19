@@ -435,7 +435,7 @@ func TestFolderGetAPIEndpoint(t *testing.T) {
 	type testCase struct {
 		description          string
 		URL                  string
-		features             featuremgmt.FeatureToggles
+		features             *featuremgmt.FeatureManager
 		expectedCode         int
 		expectedParentUIDs   []string
 		expectedParentOrgIDs []int64

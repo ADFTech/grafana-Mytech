@@ -2,9 +2,10 @@ import { render, waitFor, waitForElementToBeRemoved } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import React from 'react';
 import { Route } from 'react-router-dom';
-import { Props } from 'react-virtualized-auto-sizer';
+import { AutoSizerProps } from 'react-virtualized-auto-sizer';
 import { byRole, byTestId, byText } from 'testing-library-selector';
 
+import { selectors } from '@grafana/e2e-selectors';
 import { locationService } from '@grafana/runtime';
 
 import { TestProvider } from '../../../../../../test/helpers/TestProvider';
@@ -23,13 +24,7 @@ jest.mock('app/core/components/AppChrome/AppChromeUpdate', () => ({
 }));
 
 jest.mock('react-virtualized-auto-sizer', () => {
-  return ({ children }: Props) =>
-    children({
-      height: 600,
-      scaledHeight: 600,
-      scaledWidth: 1,
-      width: 1,
-    });
+  return ({ children }: AutoSizerProps) => children({ height: 600, width: 1 });
 });
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual('@grafana/ui'),
@@ -41,6 +36,7 @@ const ui = {
   form: {
     nameInput: byRole('textbox', { name: 'name' }),
     folder: byTestId('folder-picker'),
+    folderContainer: byTestId(selectors.components.FolderPicker.containerV2),
     group: byTestId('group-picker'),
     annotationKey: (idx: number) => byTestId(`annotation-key-${idx}`),
     annotationValue: (idx: number) => byTestId(`annotation-value-${idx}`),
@@ -79,7 +75,7 @@ describe('GrafanaModifyExport', () => {
   const grafanaRule = getGrafanaRule(undefined, {
     uid: 'test-rule-uid',
     title: 'cpu-usage',
-    namespace_uid: 'folderUID1',
+    namespace_uid: 'folder-test-uid',
     data: [
       {
         refId: 'A',
@@ -101,23 +97,21 @@ describe('GrafanaModifyExport', () => {
     mockSearchApi(server).search([
       mockDashboardSearchItem({
         title: grafanaRule.namespace.name,
-        uid: 'folderUID1',
-        url: '',
-        tags: [],
+        uid: 'folder-test-uid',
         type: DashboardSearchItemType.DashFolder,
       }),
     ]);
     mockAlertRuleApi(server).rulerRules(GRAFANA_RULES_SOURCE_NAME, {
       [grafanaRule.namespace.name]: [{ name: grafanaRule.group.name, interval: '1m', rules: [grafanaRule.rulerRule!] }],
     });
-    mockAlertRuleApi(server).rulerRuleGroup(GRAFANA_RULES_SOURCE_NAME, 'folderUID1', grafanaRule.group.name, {
-      name: grafanaRule.group.name,
-      interval: '1m',
-      rules: [grafanaRule.rulerRule!],
-    });
-    mockExportApi(server).modifiedExport('folderUID1', {
+    mockAlertRuleApi(server).rulerRuleGroup(
+      GRAFANA_RULES_SOURCE_NAME,
+      grafanaRule.namespace.name,
+      grafanaRule.group.name,
+      { name: grafanaRule.group.name, interval: '1m', rules: [grafanaRule.rulerRule!] }
+    );
+    mockExportApi(server).modifiedExport(grafanaRule.namespace.name, {
       yaml: 'Yaml Export Content',
-      json: 'Json Export Content',
     });
 
     const user = userEvent.setup();
@@ -133,7 +127,6 @@ describe('GrafanaModifyExport', () => {
     expect(drawer).toBeInTheDocument();
 
     expect(ui.exportDrawer.yamlTab.get(drawer)).toHaveAttribute('aria-selected', 'true');
-
     await waitFor(() => {
       expect(ui.exportDrawer.editor.get(drawer)).toHaveTextContent('Yaml Export Content');
     });

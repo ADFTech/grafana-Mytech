@@ -1,12 +1,12 @@
-import { render, RenderResult, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { fireEvent, render, RenderResult, screen, waitFor } from '@testing-library/react';
 import React from 'react';
-import { TestProvider } from 'test/helpers/TestProvider';
+import { Provider } from 'react-redux';
 
 import { PluginType } from '@grafana/data';
 import { contextSrv } from 'app/core/core';
 import { getCatalogPluginMock, getPluginsStateMock } from 'app/features/plugins/admin/__mocks__';
 import { CatalogPlugin } from 'app/features/plugins/admin/types';
+import { configureStore } from 'app/store/configureStore';
 import { AccessControlAction } from 'app/types';
 
 import { AddNewConnection } from './ConnectData';
@@ -14,10 +14,13 @@ import { AddNewConnection } from './ConnectData';
 jest.mock('app/features/datasources/api');
 
 const renderPage = (plugins: CatalogPlugin[] = []): RenderResult => {
+  // @ts-ignore
+  const store = configureStore({ plugins: getPluginsStateMock(plugins) });
+
   return render(
-    <TestProvider storeState={{ plugins: getPluginsStateMock(plugins) }}>
+    <Provider store={store}>
       <AddNewConnection />
-    </TestProvider>
+    </Provider>
   );
 };
 
@@ -26,6 +29,8 @@ const mockCatalogDataSourcePlugin = getCatalogPluginMock({
   name: 'Sample data source',
   id: 'sample-data-source',
 });
+
+const originalHasPermission = contextSrv.hasPermission;
 
 describe('Angular badge', () => {
   test('does not show angular badge for non-angular plugins', async () => {
@@ -60,6 +65,10 @@ describe('Angular badge', () => {
 });
 
 describe('Add new connection', () => {
+  beforeEach(() => {
+    contextSrv.hasPermission = originalHasPermission;
+  });
+
   test('renders no results if the plugins list is empty', async () => {
     renderPage();
 
@@ -82,19 +91,15 @@ describe('Add new connection', () => {
     renderPage([getCatalogPluginMock(), mockCatalogDataSourcePlugin]);
     const searchField = await screen.findByRole('textbox');
 
-    await userEvent.type(searchField, 'ampl');
+    fireEvent.change(searchField, { target: { value: 'ampl' } });
     expect(await screen.findByText('Sample data source')).toBeVisible();
 
-    await userEvent.clear(searchField);
-    await userEvent.type(searchField, 'cramp');
+    fireEvent.change(searchField, { target: { value: 'cramp' } });
     expect(screen.queryByText('No results matching your query were found.')).toBeInTheDocument();
-
-    await userEvent.clear(searchField);
-    expect(await screen.findByText('Sample data source')).toBeVisible();
   });
 
   test('shows a "No access" modal if the user does not have permissions to create datasources', async () => {
-    jest.spyOn(contextSrv, 'hasPermission').mockImplementation((permission: string) => {
+    (contextSrv.hasPermission as jest.Mock) = jest.fn().mockImplementation((permission: string) => {
       if (permission === AccessControlAction.DataSourcesCreate) {
         return false;
       }
@@ -109,7 +114,21 @@ describe('Add new connection', () => {
     expect(screen.queryByText(new RegExp(exampleSentenceInModal))).not.toBeInTheDocument();
 
     // Should show the modal if the user has no permissions
-    await userEvent.click(await screen.findByText('Sample data source'));
+    fireEvent.click(await screen.findByText('Sample data source'));
     expect(screen.queryByText(new RegExp(exampleSentenceInModal))).toBeInTheDocument();
+  });
+
+  test('does not show a "No access" modal but displays the details page if the user has the right permissions', async () => {
+    (contextSrv.hasPermission as jest.Mock) = jest.fn().mockReturnValue(true);
+
+    renderPage([getCatalogPluginMock(), mockCatalogDataSourcePlugin]);
+    const exampleSentenceInModal = 'Editors cannot add new connections.';
+
+    // Should not show the modal by default
+    expect(screen.queryByText(new RegExp(exampleSentenceInModal))).not.toBeInTheDocument();
+
+    // Should not show the modal when clicking a card
+    fireEvent.click(await screen.findByText('Sample data source'));
+    expect(screen.queryByText(new RegExp(exampleSentenceInModal))).not.toBeInTheDocument();
   });
 });

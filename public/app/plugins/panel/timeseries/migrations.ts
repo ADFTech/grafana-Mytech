@@ -23,7 +23,7 @@ import {
   GraphDrawStyle,
   GraphFieldConfig,
   GraphGradientMode,
-  GraphThresholdsStyleMode,
+  GraphTresholdsStyleMode,
   LineInterpolation,
   LineStyle,
   VisibilityMode,
@@ -399,7 +399,7 @@ export function graphToTimeseriesOptions(angular: any): {
 
   // timeRegions migration
   if (angular.timeRegions?.length) {
-    let regions = angular.timeRegions.map((old: GraphTimeRegionConfig, idx: number) => ({
+    let regions: any[] = angular.timeRegions.map((old: GraphTimeRegionConfig, idx: number) => ({
       name: `T${idx + 1}`,
       color: old.colorMode !== 'custom' ? old.colorMode : old.fillColor,
       line: old.line,
@@ -529,9 +529,9 @@ export function graphToTimeseriesOptions(angular: any): {
       });
     }
 
-    let displayMode = area ? GraphThresholdsStyleMode.Area : GraphThresholdsStyleMode.Line;
+    let displayMode = area ? GraphTresholdsStyleMode.Area : GraphTresholdsStyleMode.Line;
     if (line && area) {
-      displayMode = GraphThresholdsStyleMode.LineAndArea;
+      displayMode = GraphTresholdsStyleMode.LineAndArea;
     }
 
     // TODO move into standard ThresholdConfig ?
@@ -658,11 +658,6 @@ function fillY2DynamicValues(
     }
   }
 
-  props.push({
-    id: `custom.axisPlacement`,
-    value: AxisPlacement.Right,
-  });
-
   // Add any custom property
   const y1G = y1.custom ?? {};
   const y2G = y2.custom ?? {};
@@ -689,7 +684,7 @@ function validNumber(val: unknown): number | undefined {
   return undefined;
 }
 
-function getReducersFromLegend(obj: Record<string, unknown>): string[] {
+function getReducersFromLegend(obj: Record<string, any>): string[] {
   const ids: string[] = [];
   for (const key of Object.keys(obj)) {
     const r = fieldReducers.getIfExists(key);

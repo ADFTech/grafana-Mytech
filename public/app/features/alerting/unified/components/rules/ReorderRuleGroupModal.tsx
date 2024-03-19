@@ -27,13 +27,12 @@ interface ModalProps {
   namespace: CombinedRuleNamespace;
   group: CombinedRuleGroup;
   onClose: () => void;
-  folderUid?: string;
 }
 
 type CombinedRuleWithUID = { uid: string } & CombinedRule;
 
 export const ReorderCloudGroupModal = (props: ModalProps) => {
-  const { group, namespace, onClose, folderUid } = props;
+  const { group, namespace, onClose } = props;
   const [pending, setPending] = useState<boolean>(false);
   const [rulesList, setRulesList] = useState<CombinedRule[]>(group.rules);
 
@@ -64,7 +63,6 @@ export const ReorderCloudGroupModal = (props: ModalProps) => {
           groupName: group.name,
           rulesSourceName: rulesSourceName,
           newRules: rulerRules,
-          folderUid: folderUid || namespace.name,
         })
       )
         .unwrap()
@@ -72,7 +70,7 @@ export const ReorderCloudGroupModal = (props: ModalProps) => {
           setPending(false);
         });
     },
-    [group.name, namespace.name, namespace.rulesSource, rulesList, folderUid]
+    [group.name, namespace.name, namespace.rulesSource, rulesList]
   );
 
   // assign unique but stable identifiers to each (alerting / recording) rule

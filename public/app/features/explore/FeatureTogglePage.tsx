@@ -5,14 +5,12 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { useStyles2 } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 
-function getStyles(theme: GrafanaTheme2) {
-  return css({
-    marginTop: theme.spacing(2),
-  });
-}
-
 export default function FeatureTogglePage() {
-  const styles = useStyles2(getStyles);
+  const styles = useStyles2(
+    (theme: GrafanaTheme2) => css`
+      margin-top: ${theme.spacing(2)};
+    `
+  );
 
   return (
     <Page className={styles}>

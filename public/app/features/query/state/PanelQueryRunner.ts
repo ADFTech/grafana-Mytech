@@ -1,4 +1,4 @@
-import { cloneDeep, merge } from 'lodash';
+import { cloneDeep } from 'lodash';
 import { Observable, of, ReplaySubject, Unsubscribable } from 'rxjs';
 import { map, mergeMap, catchError } from 'rxjs/operators';
 
@@ -28,7 +28,6 @@ import {
   preProcessPanelData,
   ApplyFieldOverrideOptions,
   StreamingDataFrame,
-  DataTopic,
 } from '@grafana/data';
 import { toDataQueryError } from '@grafana/runtime';
 import { ExpressionDatasourceRef } from '@grafana/runtime/src/utils/DataSourceWithBackend';
@@ -50,7 +49,6 @@ export interface QueryRunnerOptions<
   datasource: DataSourceRef | DataSourceApi<TQuery, TOptions> | null;
   queries: TQuery[];
   panelId?: number;
-  panelPluginId?: string;
   dashboardUID?: string;
   timezone: TimeZone;
   timeRange: TimeRange;
@@ -140,14 +138,9 @@ export class PanelQueryRunner {
 
             if (withFieldConfig && data.series?.length) {
               if (lastConfigRev === this.dataConfigSource.configRev) {
-                let streamingDataFrame: StreamingDataFrame | undefined;
-
-                for (const frame of data.series) {
-                  if (isStreamingDataFrame(frame)) {
-                    streamingDataFrame = frame;
-                    break;
-                  }
-                }
+                const streamingDataFrame = data.series.find((data) => isStreamingDataFrame(data)) as
+                  | StreamingDataFrame
+                  | undefined;
 
                 if (
                   streamingDataFrame &&
@@ -220,8 +213,7 @@ export class PanelQueryRunner {
   private applyTransformations(data: PanelData): Observable<PanelData> {
     const transformations = this.dataConfigSource.getTransformations();
 
-    const allTransformationsDisabled = transformations && transformations.every((t) => t.disabled);
-    if (allTransformationsDisabled || !transformations || transformations.length === 0) {
+    if (!transformations || transformations.length === 0) {
       return of(data);
     }
 
@@ -229,18 +221,8 @@ export class PanelQueryRunner {
       interpolate: (v: string) => this.templateSrv.replace(v, data?.request?.scopedVars),
     };
 
-    let seriesTransformations = transformations.filter((t) => t.topic == null || t.topic === DataTopic.Series);
-    let annotationsTransformations = transformations.filter((t) => t.topic === DataTopic.Annotations);
-
-    let seriesStream = transformDataFrame(seriesTransformations, data.series, ctx);
-    let annotationsStream = transformDataFrame(annotationsTransformations, data.annotations ?? [], ctx);
-
-    return merge(seriesStream, annotationsStream).pipe(
-      map((frames) => {
-        let isAnnotations = frames.some((f) => f.meta?.dataTopic === DataTopic.Annotations);
-        let transformed = isAnnotations ? { annotations: frames } : { series: frames };
-        return { ...data, ...transformed };
-      }),
+    return transformDataFrame(transformations, data.series, ctx).pipe(
+      map((series) => ({ ...data, series })),
       catchError((err) => {
         console.warn('Error running transformation:', err);
         return of({
@@ -258,7 +240,6 @@ export class PanelQueryRunner {
       timezone,
       datasource,
       panelId,
-      panelPluginId,
       dashboardUID,
       timeRange,
       timeInfo,
@@ -275,15 +256,11 @@ export class PanelQueryRunner {
       return;
     }
 
-    //check if datasource is a variable datasource and if that variable has multiple values
-    const addErroDSVariable = this.shouldAddErrorWhenDatasourceVariableIsMultiple(datasource, scopedVars);
-
     const request: DataQueryRequest = {
       app: app ?? CoreApp.Dashboard,
       requestId: getNextRequestId(),
       timezone,
       panelId,
-      panelPluginId,
       dashboardUID,
       range: timeRange,
       timeInfo,
@@ -330,7 +307,7 @@ export class PanelQueryRunner {
 
       this.lastRequest = request;
 
-      this.pipeToSubject(runRequest(ds, request), panelId, false, addErroDSVariable);
+      this.pipeToSubject(runRequest(ds, request), panelId);
     } catch (err) {
       this.pipeToSubject(
         of({
@@ -344,12 +321,7 @@ export class PanelQueryRunner {
     }
   }
 
-  private pipeToSubject(
-    observable: Observable<PanelData>,
-    panelId?: number,
-    skipPreProcess = false,
-    addErroDSVariable = false
-  ) {
+  private pipeToSubject(observable: Observable<PanelData>, panelId?: number, skipPreProcess = false) {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
@@ -386,17 +358,6 @@ export class PanelQueryRunner {
         }
 
         this.lastResult = next;
-
-        //add error message if datasource is a variable and has multiple values
-        if (addErroDSVariable) {
-          next.errors = [
-            {
-              message:
-                'Panel is using a variable datasource with multiple values without repeat option. Please configure the panel to be repeated by the same datasource variable.',
-            },
-          ];
-          next.state = LoadingState.Error;
-        }
 
         // Store preprocessed query results for applying overrides later on in the pipeline
         this.subject.next(next);
@@ -469,28 +430,6 @@ export class PanelQueryRunner {
 
   getLastRequest(): DataQueryRequest | undefined {
     return this.lastRequest;
-  }
-
-  shouldAddErrorWhenDatasourceVariableIsMultiple(
-    datasource: DataSourceRef | DataSourceApi | null,
-    scopedVars: ScopedVars | undefined
-  ): boolean {
-    let addWarningMessageMultipleDatasourceVariable = false;
-
-    //If datasource is a variable
-    if (datasource?.uid?.startsWith('${')) {
-      // we can access the raw datasource variable values inside the replace function if we pass a custom format function
-      this.templateSrv.replace(datasource.uid, scopedVars, (value: string | string[]) => {
-        // if the variable has multiple values it means it's not being repeated
-        if (Array.isArray(value) && value.length > 1) {
-          addWarningMessageMultipleDatasourceVariable = true;
-        }
-        // return empty string to avoid replacing the variable
-        return '';
-      });
-    }
-
-    return addWarningMessageMultipleDatasourceVariable;
   }
 }
 

@@ -4,9 +4,9 @@ import selectEvent from 'react-select-event';
 
 import { CustomVariableModel, DataSourceInstanceSettings } from '@grafana/data';
 import * as ui from '@grafana/ui';
+import { TemplateSrv } from 'app/features/templating/template_srv';
 
-import { setupMockedTemplateService } from '../../../__mocks__/CloudWatchDataSource';
-import { initialVariableModelState } from '../../../__mocks__/CloudWatchVariables';
+import { initialVariableModelState } from '../../../__mocks__/variables';
 import { CloudWatchDatasource } from '../../../datasource';
 import { CloudWatchJsonData, MetricEditorMode, MetricQueryType } from '../../../types';
 
@@ -24,6 +24,7 @@ const setup = () => {
     jsonData: { defaultRegion: 'us-east-1' },
   } as DataSourceInstanceSettings<CloudWatchJsonData>;
 
+  const templateSrv = new TemplateSrv();
   const variable: CustomVariableModel = {
     ...initialVariableModelState,
     id: 'var3',
@@ -40,7 +41,7 @@ const setup = () => {
     query: '',
     type: 'custom',
   };
-  const templateSrv = setupMockedTemplateService([variable]);
+  templateSrv.init([variable]);
 
   const datasource = new CloudWatchDatasource(instanceSettings, templateSrv);
   datasource.metricFindQuery = async () => [{ value: 'test', label: 'test', text: 'test' }];

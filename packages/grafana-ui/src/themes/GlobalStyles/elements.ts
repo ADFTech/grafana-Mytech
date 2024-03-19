@@ -1,4 +1,4 @@
-import { css } from '@emotion/react';
+import { css, CSSObject } from '@emotion/react';
 
 import { GrafanaTheme2, ThemeTypographyVariant } from '@grafana/data';
 
@@ -144,7 +144,7 @@ export function getElementStyles(theme: GrafanaTheme2) {
   });
 }
 
-export function getVariantStyles(variant: ThemeTypographyVariant) {
+export function getVariantStyles(variant: ThemeTypographyVariant): CSSObject {
   return {
     margin: 0,
     fontSize: variant.fontSize,

@@ -1,15 +1,14 @@
 import React from 'react';
 import { SubmitHandler, Validate } from 'react-hook-form';
 
-import { Button, Field, Input, Modal } from '@grafana/ui';
-import { Form } from 'app/core/components/Form/Form';
+import { Button, Field, Form, Input, Modal } from '@grafana/ui';
 
 type FormModel = { folderName: string };
 
 interface Props {
   onSubmit: SubmitHandler<FormModel>;
   onDismiss: () => void;
-  validate: Validate<string, FormModel>;
+  validate: Validate<string>;
 }
 
 const initialFormModel = { folderName: '' };

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 
-import { createLokiDatasource } from '../../__mocks__/datasource';
+import { createLokiDatasource } from '../../mocks';
 import { LokiQuery } from '../../types';
 
 import { EXPLAIN_LABEL_FILTER_CONTENT } from './LokiQueryBuilderExplained';

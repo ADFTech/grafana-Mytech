@@ -9,7 +9,6 @@ import {
 } from '@grafana/data';
 import { ConfigSection, ConfigSubSection, DataSourceDescription, Stack } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
-import { ConnectionLimits, Divider, TLSSecretsConfig, useMigrateDatabaseFields } from '@grafana/sql';
 import {
   Collapse,
   Field,
@@ -21,6 +20,10 @@ import {
   Switch,
   Tooltip,
 } from '@grafana/ui';
+import { ConnectionLimits } from 'app/features/plugins/sql/components/configuration/ConnectionLimits';
+import { Divider } from 'app/features/plugins/sql/components/configuration/Divider';
+import { TLSSecretsConfig } from 'app/features/plugins/sql/components/configuration/TLSSecretsConfig';
+import { useMigrateDatabaseFields } from 'app/features/plugins/sql/components/configuration/useMigrateDatabaseFields';
 
 import { MySQLOptions } from '../types';
 
@@ -174,12 +177,11 @@ export const ConfigurationEditor = (props: DataSourcePluginOptionsEditorProps<My
                   <Tooltip
                     content={
                       <span>
-                        Specify the timezone used in the database session, such as <code>Europe/Berlin</code> or
-                        <code>+02:00</code>. Required if the timezone of the database (or the host of the database) is
-                        set to something other than UTC. Set this to <code>+00:00</code> so Grafana can handle times
-                        properly. Set the value used in the session with <code>SET time_zone=&apos;...&apos;</code>. If
-                        you leave this field empty, the timezone will not be updated. You can find more information in
-                        the MySQL documentation.
+                        Specify the time zone used in the database session, e.g. <code>Europe/Berlin</code> or
+                        <code>+02:00</code>. This is necessary, if the timezone of the database (or the host of the
+                        database) is set to something other than UTC. The value is set in the session with
+                        <code>SET time_zone=&apos;...&apos;</code>. If you leave this field empty, the timezone is not
+                        updated. You can find more information in the MySQL documentation.
                       </span>
                     }
                   >

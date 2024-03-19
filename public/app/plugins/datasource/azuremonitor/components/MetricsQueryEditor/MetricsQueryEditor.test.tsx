@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { selectOptionInTest } from 'test/helpers/selectOptionInTest';
 
 import createMockDatasource from '../../__mocks__/datasource';
 import { createMockInstanceSetttings } from '../../__mocks__/instanceSettings';
@@ -13,7 +14,6 @@ import {
 } from '../../__mocks__/resourcePickerRows';
 import { selectors } from '../../e2e/selectors';
 import ResourcePickerData from '../../resourcePicker/resourcePickerData';
-import { selectOptionInTest } from '../../utils/testUtils';
 
 import MetricsQueryEditor from './MetricsQueryEditor';
 

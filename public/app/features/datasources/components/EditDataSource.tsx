@@ -129,7 +129,7 @@ export function EditDataSourceView({
       trackDsConfigUpdated({ item: 'success' });
       appEvents.publish(new DataSourceUpdatedSuccessfully());
     } catch (error) {
-      trackDsConfigUpdated({ item: 'fail' });
+      trackDsConfigUpdated({ item: 'fail', error });
       return;
     }
 
@@ -139,9 +139,7 @@ export function EditDataSourceView({
   const extensions = useMemo(() => {
     const allowedPluginIds = ['grafana-pdc-app', 'grafana-auth-app'];
     const extensionPointId = PluginExtensionPoints.DataSourceConfig;
-    const { extensions } = getPluginComponentExtensions<{
-      context: PluginExtensionDataSourceConfigContext<DataSourceJsonData>;
-    }>({ extensionPointId });
+    const { extensions } = getPluginComponentExtensions({ extensionPointId });
 
     return extensions.filter((e) => allowedPluginIds.includes(e.pluginId));
   }, []);
@@ -204,7 +202,9 @@ export function EditDataSourceView({
 
       {/* Extension point */}
       {extensions.map((extension) => {
-        const Component = extension.component;
+        const Component = extension.component as React.ComponentType<{
+          context: PluginExtensionDataSourceConfigContext<DataSourceJsonData>;
+        }>;
 
         return (
           <div key={extension.id}>

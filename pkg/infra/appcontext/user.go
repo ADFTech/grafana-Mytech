@@ -61,15 +61,9 @@ func User(ctx context.Context) (*user.SignedInUser, error) {
 					IsGrafanaAdmin: true,
 					Permissions: map[int64]map[string][]string{
 						orgId: {
-							"*": {"*"}, // all resources, all scopes
-
-							// Dashboards do not support wildcard action
-							dashboards.ActionDashboardsRead:   {"*"},
-							dashboards.ActionDashboardsCreate: {"*"},
-							dashboards.ActionDashboardsWrite:  {"*"},
-							dashboards.ActionDashboardsDelete: {"*"},
-							dashboards.ActionFoldersCreate:    {"*"},
-							dashboards.ActionFoldersRead:      {dashboards.ScopeFoldersAll}, // access to read all folders
+							"*":                            {"*"},
+							dashboards.ActionFoldersCreate: {"*"},                        // all resources, all scopes
+							dashboards.ActionFoldersRead:   {dashboards.ScopeFoldersAll}, // access to read all folders
 						},
 					},
 				}, nil

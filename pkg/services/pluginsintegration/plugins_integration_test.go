@@ -17,11 +17,12 @@ import (
 	"github.com/grafana/grafana/pkg/infra/tracing"
 	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/plugins/backendplugin/coreplugin"
+	"github.com/grafana/grafana/pkg/plugins/manager/registry"
+	"github.com/grafana/grafana/pkg/services/accesscontrol/acimpl"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/pluginsintegration/pluginstore"
 	"github.com/grafana/grafana/pkg/services/searchV2"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/tests/testsuite"
 	"github.com/grafana/grafana/pkg/tsdb/azuremonitor"
 	cloudmonitoring "github.com/grafana/grafana/pkg/tsdb/cloud-monitoring"
 	"github.com/grafana/grafana/pkg/tsdb/cloudwatch"
@@ -41,10 +42,6 @@ import (
 	"github.com/grafana/grafana/pkg/tsdb/tempo"
 )
 
-func TestMain(m *testing.M) {
-	testsuite.Run(m)
-}
-
 func TestIntegrationPluginManager(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
@@ -55,42 +52,52 @@ func TestIntegrationPluginManager(t *testing.T) {
 	bundledPluginsPath, err := filepath.Abs("../../../plugins-bundled/internal")
 	require.NoError(t, err)
 
+	// We use the raw config here as it forms the basis for the setting.Provider implementation
+	// The plugin manager also relies directly on the setting.Cfg struct to provide Grafana specific
+	// properties such as the loading paths
+	raw, err := ini.Load([]byte(`
+		app_mode = production
+
+		[plugin.test-app]
+		path=../../plugins/manager/testdata/test-app
+
+		[plugin.test-panel]
+		not=included
+		`),
+	)
+	require.NoError(t, err)
+
 	features := featuremgmt.WithFeatures()
 	cfg := &setting.Cfg{
-		Raw:                ini.Empty(),
+		Raw:                raw,
 		StaticRootPath:     staticRootPath,
 		BundledPluginsPath: bundledPluginsPath,
 		Azure:              &azsettings.AzureSettings{},
-		PluginSettings: map[string]map[string]string{
-			"test-app": {
-				"path": "../../plugins/manager/testdata/test-app",
-			},
-			"test-panel": {
-				"not": "included",
-			},
-		},
+
+		// nolint:staticcheck
+		IsFeatureToggleEnabled: features.IsEnabledGlobally,
 	}
 
 	tracer := tracing.InitializeTracerForTest()
 
 	hcp := httpclient.NewProvider()
-	am := azuremonitor.ProvideService(hcp)
-	cw := cloudwatch.ProvideService(hcp)
-	cm := cloudmonitoring.ProvideService(hcp)
+	am := azuremonitor.ProvideService(cfg, hcp, features)
+	cw := cloudwatch.ProvideService(cfg, hcp, features)
+	cm := cloudmonitoring.ProvideService(hcp, tracer)
 	es := elasticsearch.ProvideService(hcp, tracer)
 	grap := graphite.ProvideService(hcp, tracer)
 	idb := influxdb.ProvideService(hcp, features)
 	lk := loki.ProvideService(hcp, features, tracer)
 	otsdb := opentsdb.ProvideService(hcp)
-	pr := prometheus.ProvideService(hcp)
+	pr := prometheus.ProvideService(hcp, cfg, features)
 	tmpo := tempo.ProvideService(hcp)
 	td := testdatasource.ProvideService()
 	pg := postgres.ProvideService(cfg)
-	my := mysql.ProvideService()
+	my := mysql.ProvideService(cfg, hcp)
 	ms := mssql.ProvideService(cfg)
 	sv2 := searchV2.ProvideService(cfg, db.InitTestDB(t), nil, nil, tracer, features, nil, nil, nil)
 	graf := grafanads.ProvideService(sv2, nil)
-	pyroscope := pyroscope.ProvideService(hcp)
+	pyroscope := pyroscope.ProvideService(hcp, acimpl.ProvideAccessControl(cfg))
 	parca := parca.ProvideService(hcp)
 	coreRegistry := coreplugin.ProvideCoreRegistry(tracing.InitializeTracerForTest(), am, cw, cm, es, grap, idb, lk, otsdb, pr, tmpo, td, pg, my, ms, graf, pyroscope, parca)
 
@@ -98,7 +105,8 @@ func TestIntegrationPluginManager(t *testing.T) {
 
 	ctx := context.Background()
 	verifyCorePluginCatalogue(t, ctx, testCtx.PluginStore)
-	verifyPluginStaticRoutes(t, ctx, testCtx.PluginStore, testCtx.PluginStore)
+	verifyBundledPlugins(t, ctx, testCtx.PluginStore)
+	verifyPluginStaticRoutes(t, ctx, testCtx.PluginStore, testCtx.PluginRegistry)
 	verifyBackendProcesses(t, testCtx.PluginRegistry.Plugins(ctx))
 	verifyPluginQuery(t, ctx, testCtx.PluginClient)
 }
@@ -132,6 +140,7 @@ func verifyCorePluginCatalogue(t *testing.T, ctx context.Context, ps *pluginstor
 	t.Helper()
 
 	expPanels := map[string]struct{}{
+		"alertGroups":    {},
 		"alertlist":      {},
 		"annolist":       {},
 		"barchart":       {},
@@ -168,8 +177,8 @@ func verifyCorePluginCatalogue(t *testing.T, ctx context.Context, ps *pluginstor
 
 	expDataSources := map[string]struct{}{
 		"cloudwatch":                       {},
-		"grafana-azure-monitor-datasource": {},
 		"stackdriver":                      {},
+		"grafana-azure-monitor-datasource": {},
 		"elasticsearch":                    {},
 		"graphite":                         {},
 		"influxdb":                         {},
@@ -184,6 +193,7 @@ func verifyCorePluginCatalogue(t *testing.T, ctx context.Context, ps *pluginstor
 		"grafana":                          {},
 		"alertmanager":                     {},
 		"dashboard":                        {},
+		"input":                            {},
 		"jaeger":                           {},
 		"mixed":                            {},
 		"zipkin":                           {},
@@ -225,17 +235,45 @@ func verifyCorePluginCatalogue(t *testing.T, ctx context.Context, ps *pluginstor
 	require.Equal(t, len(expPanels)+len(expDataSources)+len(expApps), len(ps.Plugins(ctx)))
 }
 
-func verifyPluginStaticRoutes(t *testing.T, ctx context.Context, rr plugins.StaticRouteResolver, ps *pluginstore.Service) {
+func verifyBundledPlugins(t *testing.T, ctx context.Context, ps *pluginstore.Service) {
+	t.Helper()
+
+	dsPlugins := make(map[string]struct{})
+	for _, p := range ps.Plugins(ctx, plugins.TypeDataSource) {
+		dsPlugins[p.ID] = struct{}{}
+	}
+
+	inputPlugin, exists := ps.Plugin(ctx, "input")
+	require.True(t, exists)
+	require.NotEqual(t, pluginstore.Plugin{}, inputPlugin)
+	require.NotNil(t, dsPlugins["input"])
+
+	pluginRoutes := make(map[string]*plugins.StaticRoute)
+	for _, r := range ps.Routes(ctx) {
+		pluginRoutes[r.PluginID] = r
+	}
+
+	for _, pluginID := range []string{"input"} {
+		require.Contains(t, pluginRoutes, pluginID)
+		require.Equal(t, pluginRoutes[pluginID].Directory, inputPlugin.Base())
+	}
+}
+
+func verifyPluginStaticRoutes(t *testing.T, ctx context.Context, rr plugins.StaticRouteResolver, reg registry.Service) {
 	routes := make(map[string]*plugins.StaticRoute)
 	for _, route := range rr.Routes(ctx) {
 		routes[route.PluginID] = route
 	}
 
-	require.Len(t, routes, 1)
+	require.Len(t, routes, 2)
 
-	testAppPlugin, _ := ps.Plugin(ctx, "test-app")
+	inputPlugin, _ := reg.Plugin(ctx, "input")
+	require.NotNil(t, routes["input"])
+	require.Equal(t, routes["input"].Directory, inputPlugin.FS.Base())
+
+	testAppPlugin, _ := reg.Plugin(ctx, "test-app")
 	require.Contains(t, routes, "test-app")
-	require.Equal(t, routes["test-app"].Directory, testAppPlugin.Base())
+	require.Equal(t, routes["test-app"].Directory, testAppPlugin.FS.Base())
 }
 
 func verifyBackendProcesses(t *testing.T, ps []*plugins.Plugin) {

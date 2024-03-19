@@ -1,15 +1,6 @@
 import { css } from '@emotion/css';
-import {
-  autoUpdate,
-  flip,
-  offset,
-  shift,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions,
-} from '@floating-ui/react';
 import React, { useState } from 'react';
+import { usePopperTooltip } from 'react-popper-tooltip';
 
 import { GrafanaTheme2, renderMarkdown } from '@grafana/data';
 import { FlexItem } from '@grafana/experimental';
@@ -25,46 +16,28 @@ export interface Props {
 export const OperationInfoButton = React.memo<Props>(({ def, operation }) => {
   const styles = useStyles2(getStyles);
   const [show, setShow] = useState(false);
-
-  // the order of middleware is important!
-  const middleware = [
-    offset(16),
-    flip({
-      fallbackAxisSideDirection: 'end',
-      // see https://floating-ui.com/docs/flip#combining-with-shift
-      crossAxis: false,
-      boundary: document.body,
-    }),
-    shift(),
-  ];
-
-  const { context, refs, floatingStyles } = useFloating({
-    open: show,
+  const { getTooltipProps, setTooltipRef, setTriggerRef, visible } = usePopperTooltip({
     placement: 'top',
-    onOpenChange: setShow,
-    middleware,
-    whileElementsMounted: autoUpdate,
+    visible: show,
+    offset: [0, 16],
+    onVisibleChange: setShow,
+    interactive: true,
+    trigger: ['click'],
   });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-
-  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss, click]);
 
   return (
     <>
       <Button
         title="Click to show description"
-        ref={refs.setReference}
+        ref={setTriggerRef}
         icon="info-circle"
         size="sm"
         variant="secondary"
         fill="text"
-        {...getReferenceProps()}
       />
-      {show && (
+      {visible && (
         <Portal>
-          <div ref={refs.setFloating} style={floatingStyles} {...getFloatingProps()} className={styles.docBox}>
+          <div ref={setTooltipRef} {...getTooltipProps()} className={styles.docBox}>
             <div className={styles.docBoxHeader}>
               <span>{def.renderer(operation, def, '<expr>')}</span>
               <FlexItem grow={1} />
@@ -111,6 +84,14 @@ const getStyles = (theme: GrafanaTheme2) => {
     docBoxBody: css({
       // The markdown paragraph has a marginBottom this removes it
       marginBottom: theme.spacing(-1),
+      color: theme.colors.text.secondary,
+    }),
+    signature: css({
+      fontSize: theme.typography.bodySmall.fontSize,
+      fontFamily: theme.typography.fontFamilyMonospace,
+    }),
+    dropdown: css({
+      opacity: 0,
       color: theme.colors.text.secondary,
     }),
   };

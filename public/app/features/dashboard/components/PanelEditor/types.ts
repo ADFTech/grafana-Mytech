@@ -56,7 +56,7 @@ export interface OptionPaneRenderProps {
   data?: PanelData;
   dashboard: DashboardModel;
   instanceState: unknown;
-  onPanelConfigChange: <T extends keyof PanelModel>(configKey: T, value: PanelModel[T]) => void;
+  onPanelConfigChange: (configKey: keyof PanelModel, value: unknown) => void;
   onPanelOptionsChanged: (options: PanelModel['options']) => void;
   onFieldConfigsChange: (config: FieldConfigSource) => void;
 }

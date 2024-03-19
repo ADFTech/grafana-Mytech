@@ -543,10 +543,10 @@
       "pluginVersion": "8.1.0-pre",
       "targets": [
         {
-          "expr": "sum by (status_code) (irate(grafana_http_request_duration_seconds_count[5m]))",
+          "expr": "sum by (statuscode) (irate(http_request_total{job='grafana'}[5m]))",
           "format": "time_series",
           "intervalFactor": 3,
-          "legendFormat": "{{status_code}}",
+          "legendFormat": "{{statuscode}}",
           "refId": "B",
           "step": 15,
           "target": "dev.grafana.cb-office.alerting.active_alerts"
@@ -735,7 +735,7 @@
       ],
       "targets": [
         {
-          "expr": "sort(topk(8, sum by (handler) (grafana_http_request_duration_seconds_count)))",
+          "expr": "sort(topk(8, sum by (handler) (http_request_total{job=\"grafana\"})))",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 10,
@@ -1183,5 +1183,5 @@
   "timezone": "",
   "title": "Grafana metrics",
   "uid": "isFoa0z7k",
-  "version": 3
+  "version": 2
 }

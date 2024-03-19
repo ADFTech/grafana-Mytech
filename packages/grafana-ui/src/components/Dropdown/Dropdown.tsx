@@ -1,20 +1,10 @@
 import { css } from '@emotion/css';
-import {
-  autoUpdate,
-  flip,
-  offset as floatingUIOffset,
-  shift,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions,
-} from '@floating-ui/react';
 import { FocusScope } from '@react-aria/focus';
 import React, { useEffect, useRef, useState } from 'react';
+import { usePopperTooltip } from 'react-popper-tooltip';
 import { CSSTransition } from 'react-transition-group';
 
 import { ReactUtils } from '../../utils';
-import { getPlacement } from '../../utils/tooltipUtils';
 import { Portal } from '../Portal/Portal';
 import { TooltipPlacement } from '../Tooltip/types';
 
@@ -35,32 +25,16 @@ export const Dropdown = React.memo(({ children, overlay, placement, offset, onVi
     onVisibleChange?.(show);
   }, [onVisibleChange, show]);
 
-  // the order of middleware is important!
-  const middleware = [
-    floatingUIOffset({
-      mainAxis: offset?.[0] ?? 8,
-      crossAxis: offset?.[1] ?? 0,
-    }),
-    flip({
-      fallbackAxisSideDirection: 'end',
-      // see https://floating-ui.com/docs/flip#combining-with-shift
-      crossAxis: false,
-      boundary: document.body,
-    }),
-    shift(),
-  ];
-
-  const { context, refs, floatingStyles } = useFloating({
-    open: show,
-    placement: getPlacement(placement),
-    onOpenChange: setShow,
-    middleware,
-    whileElementsMounted: autoUpdate,
+  const { getArrowProps, getTooltipProps, setTooltipRef, setTriggerRef, visible } = usePopperTooltip({
+    visible: show,
+    placement: placement,
+    onVisibleChange: setShow,
+    interactive: true,
+    delayHide: 0,
+    delayShow: 0,
+    offset: offset ?? [0, 8],
+    trigger: ['click'],
   });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss, click]);
 
   const animationDuration = 150;
   const animationStyles = getStyles(animationDuration);
@@ -70,7 +44,7 @@ export const Dropdown = React.memo(({ children, overlay, placement, offset, onVi
   };
 
   const handleKeys = (event: React.KeyboardEvent) => {
-    if (event.key === 'Tab') {
+    if (event.key === 'Escape' || event.key === 'Tab') {
       setShow(false);
     }
   };
@@ -78,10 +52,9 @@ export const Dropdown = React.memo(({ children, overlay, placement, offset, onVi
   return (
     <>
       {React.cloneElement(children, {
-        ref: refs.setReference,
-        ...getReferenceProps(),
+        ref: setTriggerRef,
       })}
-      {show && (
+      {visible && (
         <Portal>
           <FocusScope autoFocus restoreFocus contain>
             {/*
@@ -89,7 +62,8 @@ export const Dropdown = React.memo(({ children, overlay, placement, offset, onVi
               see https://github.com/jsx-eslint/eslint-plugin-jsx-a11y/blob/main/docs/rules/no-static-element-interactions.md#case-the-event-handler-is-only-being-used-to-capture-bubbled-events
             */}
             {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
-            <div ref={refs.setFloating} style={floatingStyles} onClick={onOverlayClicked} onKeyDown={handleKeys}>
+            <div ref={setTooltipRef} {...getTooltipProps()} onClick={onOverlayClicked} onKeyDown={handleKeys}>
+              <div {...getArrowProps({ className: 'tooltip-arrow' })} />
               <CSSTransition
                 nodeRef={transitionRef}
                 appear={true}
@@ -97,7 +71,7 @@ export const Dropdown = React.memo(({ children, overlay, placement, offset, onVi
                 timeout={{ appear: animationDuration, exit: 0, enter: 0 }}
                 classNames={animationStyles}
               >
-                <div ref={transitionRef}>{ReactUtils.renderOrCallToRender(overlay, { ...getFloatingProps() })}</div>
+                <div ref={transitionRef}>{ReactUtils.renderOrCallToRender(overlay, {})}</div>
               </CSSTransition>
             </div>
           </FocusScope>

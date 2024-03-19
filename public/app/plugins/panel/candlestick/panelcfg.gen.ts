@@ -4,7 +4,7 @@
 //     public/app/plugins/gen.go
 // Using jennies:
 //     TSTypesJenny
-//     PluginTsTypesJenny
+//     PluginTSTypesJenny
 //
 // Run 'make gen-cue' from repository root to regenerate.
 
@@ -61,7 +61,7 @@ export const defaultCandlestickColors: Partial<CandlestickColors> = {
   up: 'green',
 };
 
-export interface Options extends common.OptionsWithLegend, common.OptionsWithTooltip {
+export interface Options extends common.OptionsWithLegend {
   /**
    * Sets the style of the candlesticks
    */

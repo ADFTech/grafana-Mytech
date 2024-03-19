@@ -21,9 +21,12 @@ import {
   withTheme,
   IconButton,
   ButtonGroup,
+  Box,
+  Text,
+  Stack,
 } from '@grafana/ui';
 import config from 'app/core/config';
-import { EmptyTransformationsMessage } from 'app/features/dashboard-scene/panel-edit/PanelDataPane/EmptyTransformationsMessage';
+import { Trans } from 'app/core/internationalization';
 
 import { PanelModel } from '../../state';
 import { PanelNotSupported } from '../PanelEditor/PanelNotSupported';
@@ -37,17 +40,12 @@ interface TransformationsEditorProps extends Themeable {
   panel: PanelModel;
 }
 
-export const VIEW_ALL_VALUE = 'viewAll';
+const VIEW_ALL_VALUE = 'viewAll';
 export type viewAllType = 'viewAll';
 export type FilterCategory = TransformerCategory | viewAllType;
 
-export interface TransformationData {
-  series: DataFrame[];
-  annotations?: DataFrame[];
-}
-
 interface State {
-  data: TransformationData;
+  data: DataFrame[];
   transformations: TransformationsEditorTransformation[];
   search: string;
   showPicker?: boolean;
@@ -70,9 +68,7 @@ class UnThemedTransformationsEditor extends React.PureComponent<TransformationsE
         transformation: t,
         id: ids[i],
       })),
-      data: {
-        series: [],
-      },
+      data: [],
       search: '',
       selectedFilter: VIEW_ALL_VALUE,
       showIllustrations: true,
@@ -124,7 +120,7 @@ class UnThemedTransformationsEditor extends React.PureComponent<TransformationsE
       .getQueryRunner()
       .getData({ withTransforms: false, withFieldConfig: false })
       .subscribe({
-        next: (panelData: PanelData) => this.setState({ data: panelData }),
+        next: (panelData: PanelData) => this.setState({ data: panelData.series }),
       });
   }
 
@@ -255,11 +251,36 @@ class UnThemedTransformationsEditor extends React.PureComponent<TransformationsE
 
   renderEmptyMessage = () => {
     return (
-      <EmptyTransformationsMessage
-        onShowPicker={() => {
-          this.setState({ showPicker: true });
-        }}
-      ></EmptyTransformationsMessage>
+      <Box alignItems="center" padding={4}>
+        <Stack direction="column" alignItems="center" gap={2}>
+          <Text element="h3" textAlignment="center">
+            <Trans key="transformations.empty.add-transformation-header">Start transforming data</Trans>
+          </Text>
+          <Text
+            element="p"
+            textAlignment="center"
+            data-testid={selectors.components.Transforms.noTransformationsMessage}
+          >
+            <Trans key="transformations.empty.add-transformation-body">
+              Transformations allow data to be changed in various ways before your visualization is shown.
+              <br />
+              This includes joining data together, renaming fields, making calculations, formatting data for display,
+              and more.
+            </Trans>
+          </Text>
+          <Button
+            icon="plus"
+            variant="primary"
+            size="md"
+            onClick={() => {
+              this.setState({ showPicker: true });
+            }}
+            data-testid={selectors.components.Transforms.addTransformationButton}
+          >
+            Add transformation
+          </Button>
+        </Stack>
+      </Box>
     );
   };
 
@@ -359,13 +380,11 @@ class UnThemedTransformationsEditor extends React.PureComponent<TransformationsE
           search={search}
           suffix={suffix}
           xforms={xforms}
-          onClose={() => this.setState({ showPicker: false })}
-          onSelectedFilterChange={(filter) => this.setState({ selectedFilter: filter })}
-          onShowIllustrationsChange={(showIllustrations) => this.setState({ showIllustrations })}
+          setState={this.setState.bind(this)}
           onSearchChange={this.onSearchChange}
           onSearchKeyDown={this.onSearchKeyDown}
           onTransformationAdd={this.onTransformationAdd}
-          data={this.state.data.series}
+          data={this.state.data}
           selectedFilter={this.state.selectedFilter}
           showIllustrations={this.state.showIllustrations}
         />

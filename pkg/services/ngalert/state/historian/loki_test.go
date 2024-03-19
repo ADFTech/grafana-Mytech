@@ -13,7 +13,6 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana/pkg/infra/log"
-	"github.com/grafana/grafana/pkg/services/ngalert/client"
 	"github.com/grafana/grafana/pkg/services/ngalert/eval"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
@@ -22,6 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/require"
+	"github.com/weaveworks/common/http/client"
 )
 
 func TestRemoteLokiBackend(t *testing.T) {
@@ -31,7 +31,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 			l := log.NewNopLogger()
 			states := singleFromNormal(&state.State{State: eval.Normal})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			require.Empty(t, res.Values)
 		})
@@ -41,7 +41,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 			l := log.NewNopLogger()
 			states := singleFromNormal(&state.State{State: eval.Error, Error: fmt.Errorf("oh no")})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			require.Contains(t, entry.Error, "oh no")
@@ -52,7 +52,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 			l := log.NewNopLogger()
 			states := singleFromNormal(&state.State{State: eval.NoData})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			_ = requireSingleEntry(t, res)
 		})
@@ -65,7 +65,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Labels: data.Labels{"a": "b"},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			exp := map[string]string{
 				StateHistoryLabelKey: StateHistoryLabelValue,
@@ -84,7 +84,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Labels: data.Labels{"__private__": "b"},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			require.NotContains(t, res.Stream, "__private__")
 		})
@@ -97,8 +97,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Labels: data.Labels{"a": "b"},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
-
+			res := statesToStream(rule, states, nil, l)
 			entry := requireSingleEntry(t, res)
 
 			require.Equal(t, rule.Title, entry.RuleTitle)
@@ -114,7 +113,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Labels: data.Labels{"statelabel": "labelvalue"},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			require.Contains(t, entry.InstanceLabels, "statelabel")
@@ -132,7 +131,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			require.Len(t, entry.InstanceLabels, 3)
@@ -146,7 +145,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Values: map[string]float64{"A": 2.0, "B": 5.5},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			require.NotNil(t, entry.Values)
@@ -165,7 +164,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				Labels: data.Labels{"a": "b"},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			require.Equal(t, rule.Condition, entry.Condition)
@@ -183,7 +182,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 				},
 			})
 
-			res := StatesToStream(rule, states, nil, l)
+			res := statesToStream(rule, states, nil, l)
 
 			entry := requireSingleEntry(t, res)
 			exp := labelFingerprint(states[0].Labels)
@@ -282,7 +281,7 @@ func TestRemoteLokiBackend(t *testing.T) {
 
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
-				res, err := BuildLogQuery(tc.query)
+				res, err := buildLogQuery(tc.query)
 				require.NoError(t, err)
 				require.Equal(t, tc.exp, res)
 			})
@@ -538,15 +537,15 @@ func createTestRule() history_model.RuleMeta {
 	}
 }
 
-func requireSingleEntry(t *testing.T, res Stream) LokiEntry {
+func requireSingleEntry(t *testing.T, res Stream) lokiEntry {
 	require.Len(t, res.Values, 1)
 	return requireEntry(t, res.Values[0])
 }
 
-func requireEntry(t *testing.T, row Sample) LokiEntry {
+func requireEntry(t *testing.T, row Sample) lokiEntry {
 	t.Helper()
 
-	var entry LokiEntry
+	var entry lokiEntry
 	err := json.Unmarshal([]byte(row.V), &entry)
 	require.NoError(t, err)
 	return entry

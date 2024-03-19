@@ -27,7 +27,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/quota/quotatest"
 	"github.com/grafana/grafana/pkg/services/sqlstore"
 	"github.com/grafana/grafana/pkg/services/sqlstore/permissions"
-	"github.com/grafana/grafana/pkg/services/supportbundles/supportbundlestest"
 	"github.com/grafana/grafana/pkg/services/tag/tagimpl"
 	"github.com/grafana/grafana/pkg/services/user"
 )
@@ -84,7 +83,7 @@ func setupBenchMark(b *testing.B, usr user.SignedInUser, features featuremgmt.Fe
 	dashboardWriteStore, err := database.ProvideDashboardStore(store, store.Cfg, features, tagimpl.ProvideService(store), quotaService)
 	require.NoError(b, err)
 
-	folderSvc := folderimpl.ProvideService(mock.New(), bus.ProvideBus(tracing.InitializeTracerForTest()), store.Cfg, dashboardWriteStore, folderimpl.ProvideDashboardFolderStore(store), store, features, supportbundlestest.NewFakeBundleService(), nil)
+	folderSvc := folderimpl.ProvideService(mock.New(), bus.ProvideBus(tracing.InitializeTracerForTest()), store.Cfg, dashboardWriteStore, folderimpl.ProvideDashboardFolderStore(store), store, features, nil)
 
 	origNewGuardian := guardian.New
 	guardian.MockDashboardGuardian(&guardian.FakeDashboardGuardian{CanViewValue: true, CanSaveValue: true})
@@ -126,15 +125,15 @@ func setupBenchMark(b *testing.B, usr user.SignedInUser, features featuremgmt.Fe
 		str := fmt.Sprintf("dashboard under folder %s", leaf.Title)
 		now := time.Now()
 		dashes = append(dashes, dashboards.Dashboard{
-			OrgID:     usr.OrgID,
-			IsFolder:  false,
-			UID:       str,
-			Slug:      str,
-			Title:     str,
-			Data:      simplejson.New(),
-			Created:   now,
-			Updated:   now,
-			FolderUID: leaf.UID,
+			OrgID:    usr.OrgID,
+			IsFolder: false,
+			UID:      str,
+			Slug:     str,
+			Title:    str,
+			Data:     simplejson.New(),
+			Created:  now,
+			Updated:  now,
+			FolderID: leaf.ID, // nolint:staticcheck
 		})
 	}
 
@@ -178,7 +177,8 @@ func setupBenchMark(b *testing.B, usr user.SignedInUser, features featuremgmt.Fe
 			})
 			for _, dash := range dashes {
 				// add permission to read dashboards under the general
-				if dash.FolderUID == "" {
+				// nolint:staticcheck
+				if dash.FolderID == 0 {
 					permissions = append(permissions, accesscontrol.Permission{
 						RoleID:  int64(i),
 						Action:  dashboards.ActionDashboardsRead,

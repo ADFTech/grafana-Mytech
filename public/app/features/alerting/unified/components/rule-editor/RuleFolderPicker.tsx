@@ -2,11 +2,11 @@ import { css } from '@emotion/css';
 import React from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
-import { Icon, Stack, Tooltip, useStyles2 } from '@grafana/ui';
-import { Props as FolderPickerProps, OldFolderPicker } from 'app/core/components/Select/OldFolderPicker';
+import { Icon, Tooltip, useStyles2, Stack } from '@grafana/ui';
+import { OldFolderPicker, Props as FolderPickerProps } from 'app/core/components/Select/OldFolderPicker';
 import { PermissionLevelString, SearchQueryType } from 'app/types';
 
-import { CustomAdd, FolderWarning } from '../../../../../core/components/Select/OldFolderPicker';
+import { FolderWarning, CustomAdd } from '../../../../../core/components/Select/OldFolderPicker';
 
 export interface Folder {
   title: string;
@@ -15,7 +15,6 @@ export interface Folder {
 
 export interface RuleFolderPickerProps extends Omit<FolderPickerProps, 'initialTitle' | 'initialFolderId'> {
   value?: Folder;
-  invalid?: boolean;
 }
 
 const SlashesWarning = () => {
@@ -52,6 +51,7 @@ export function RuleFolderPicker(props: RuleFolderPickerProps) {
       showRoot={false}
       rootName=""
       allowEmpty={true}
+      initialTitle={value?.title}
       initialFolderUid={value?.uid}
       searchQueryType={SearchQueryType.AlertFolder}
       {...props}

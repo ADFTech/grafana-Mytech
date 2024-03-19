@@ -142,15 +142,6 @@ export interface UserAnonymousDeviceDTO {
   avatarUrl?: string;
 }
 
-export type AnonUserFilter = Record<string, string | boolean | SelectableValue[]>;
-
 export interface UserListAnonymousDevicesState {
   devices: UserAnonymousDeviceDTO[];
-  query: string;
-  perPage: number;
-  page: number;
-  totalPages: number;
-  showPaging: boolean;
-  filters: AnonUserFilter[];
-  sort?: string;
 }

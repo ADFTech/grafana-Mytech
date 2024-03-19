@@ -4,17 +4,14 @@ import { usePrevious } from 'react-use';
 
 import { CoreApp, LoadingState } from '@grafana/data';
 import { selectors } from '@grafana/e2e-selectors';
-import {
-  EditorHeader,
-  EditorRows,
-  FlexItem,
-  QueryEditorModeToggle,
-  QueryHeaderSwitch,
-  QueryEditorMode,
-} from '@grafana/experimental';
+import { EditorHeader, EditorRows, FlexItem, Space, Stack } from '@grafana/experimental';
 import { config, reportInteraction } from '@grafana/runtime';
-import { Button, ConfirmModal, Space, Stack } from '@grafana/ui';
+import { Button, ConfirmModal } from '@grafana/ui';
+import { QueryEditorModeToggle } from 'app/plugins/datasource/prometheus/querybuilder/shared/QueryEditorModeToggle';
+import { QueryHeaderSwitch } from 'app/plugins/datasource/prometheus/querybuilder/shared/QueryHeaderSwitch';
+import { QueryEditorMode } from 'app/plugins/datasource/prometheus/querybuilder/shared/types';
 
+import { lokiQueryEditorExplainKey, useFlag } from '../../prometheus/querybuilder/shared/hooks/useFlag';
 import { LabelBrowserModal } from '../querybuilder/components/LabelBrowserModal';
 import { LokiQueryBuilderContainer } from '../querybuilder/components/LokiQueryBuilderContainer';
 import { LokiQueryBuilderOptions } from '../querybuilder/components/LokiQueryBuilderOptions';
@@ -31,8 +28,6 @@ export const testIds = {
   editor: 'loki-editor',
 };
 
-export const lokiQueryEditorExplainKey = 'LokiQueryEditorExplainDefault';
-
 export const LokiQueryEditor = React.memo<LokiQueryEditorProps>((props) => {
   const id = useId();
   const { onChange, onRunQuery, onAddQuery, data, app, queries, datasource, range: timeRange } = props;
@@ -41,7 +36,7 @@ export const LokiQueryEditor = React.memo<LokiQueryEditorProps>((props) => {
   const [dataIsStale, setDataIsStale] = useState(false);
   const [labelBrowserVisible, setLabelBrowserVisible] = useState(false);
   const [queryStats, setQueryStats] = useState<QueryStats | null>(null);
-  const [explain, setExplain] = useState(window.localStorage.getItem(lokiQueryEditorExplainKey) === 'true');
+  const { flag: explain, setFlag: setExplain } = useFlag(lokiQueryEditorExplainKey);
 
   const predefinedOperations = datasource.predefinedOperations;
   const previousTimeRange = usePrevious(timeRange);
@@ -57,7 +52,6 @@ export const LokiQueryEditor = React.memo<LokiQueryEditorProps>((props) => {
   const editorMode = query.editorMode!;
 
   const onExplainChange = (event: SyntheticEvent<HTMLInputElement>) => {
-    window.localStorage.setItem(lokiQueryEditorExplainKey, event.currentTarget.checked ? 'true' : 'false');
     setExplain(event.currentTarget.checked);
   };
 

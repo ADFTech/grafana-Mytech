@@ -1,8 +1,4 @@
-import {
-  DataQuery as SchemaDataQuery,
-  DataSourceRef as SchemaDataSourceRef,
-  DataTopic as SchemaDataTopic,
-} from '@grafana/schema';
+import { DataQuery as SchemaDataQuery, DataSourceRef as SchemaDataSourceRef } from '@grafana/schema';
 
 /**
  * @deprecated use the type from @grafana/schema
@@ -17,9 +13,12 @@ export interface DataSourceRef extends SchemaDataSourceRef {}
 /**
  * Attached to query results (not persisted)
  *
- * @deprecated use the type from @grafana/schema
+ * @public
  */
-export { SchemaDataTopic as DataTopic };
+export enum DataTopic {
+  Annotations = 'annotations',
+  AlertStates = 'alertStates',
+}
 
 /**
  * Abstract representation of any label-based query

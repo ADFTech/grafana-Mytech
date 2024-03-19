@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 
-import { createLokiDatasource } from '../../__mocks__/datasource';
+import { createLokiDatasource } from '../../mocks';
 
 import MonacoQueryField from './MonacoQueryField';
 import { Props } from './MonacoQueryFieldProps';

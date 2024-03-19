@@ -188,7 +188,7 @@ export function RichHistoryCard(props: Props) {
     const queriesToRun = queryHistoryItem.queries;
     const differentDataSource = queryHistoryItem.datasourceUid !== datasourceInstance?.uid;
     if (differentDataSource) {
-      await changeDatasource({ exploreId, datasource: queryHistoryItem.datasourceUid });
+      await changeDatasource(exploreId, queryHistoryItem.datasourceUid);
     }
     setQueries(exploreId, queriesToRun);
 

@@ -2,8 +2,9 @@ import { css } from '@emotion/css';
 import React from 'react';
 
 import { GrafanaTheme2, VariableOrigin, DataLinkBuiltInVars } from '@grafana/data';
-import { ConfigDescriptionLink, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSubSection } from '@grafana/experimental';
 import { Button, useStyles2 } from '@grafana/ui';
+import { ConfigDescriptionLink } from 'app/core/components/ConfigDescriptionLink';
 
 import { DataLinkConfig } from '../types';
 

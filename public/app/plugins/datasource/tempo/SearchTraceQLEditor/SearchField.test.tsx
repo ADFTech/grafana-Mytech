@@ -1,29 +1,24 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React from 'react';
+import { initTemplateSrv } from 'test/helpers/initTemplateSrv';
 
 import { LanguageProvider } from '@grafana/data';
+import { FetchError, setTemplateSrv } from '@grafana/runtime';
 
 import { TraceqlFilter, TraceqlSearchScope } from '../dataquery.gen';
 import { TempoDatasource } from '../datasource';
 import TempoLanguageProvider from '../language_provider';
-import { initTemplateSrv } from '../test_utils';
 import { keywordOperators, numberOperators, operators, stringOperators } from '../traceql/traceql';
 
 import SearchField from './SearchField';
 
 describe('SearchField', () => {
+  let templateSrv = initTemplateSrv('key', [{ name: 'templateVariable1' }, { name: 'templateVariable2' }]);
   let user: ReturnType<typeof userEvent.setup>;
 
   beforeEach(() => {
-    const expectedValues = {
-      interpolationVar: 'interpolationText',
-      interpolationText: 'interpolationText',
-      interpolationVarWithPipe: 'interpolationTextOne|interpolationTextTwo',
-      scopedInterpolationText: 'scopedInterpolationText',
-    };
-    initTemplateSrv([{ name: 'templateVariable1' }, { name: 'templateVariable2' }], expectedValues);
-
+    setTemplateSrv(templateSrv);
     jest.useFakeTimers();
     // Need to use delay: null here to work with fakeTimers
     // see https://github.com/testing-library/user-event/issues/833
@@ -124,19 +119,19 @@ describe('SearchField', () => {
       jest.advanceTimersByTime(1000);
       const tag22 = await screen.findByText('tag22');
       await user.click(tag22);
-      expect(updateFilter).toHaveBeenCalledWith({ ...filter, tag: 'tag22', value: [] });
+      expect(updateFilter).toHaveBeenCalledWith({ ...filter, tag: 'tag22' });
 
       // Select tag1 as the tag
       await user.click(select);
       jest.advanceTimersByTime(1000);
       const tag1 = await screen.findByText('tag1');
       await user.click(tag1);
-      expect(updateFilter).toHaveBeenCalledWith({ ...filter, tag: 'tag1', value: [] });
+      expect(updateFilter).toHaveBeenCalledWith({ ...filter, tag: 'tag1' });
 
       // Remove the tag
       const tagRemove = await screen.findByLabelText('select-clear-value');
       await user.click(tagRemove);
-      expect(updateFilter).toHaveBeenCalledWith({ ...filter, value: [] });
+      expect(updateFilter).toHaveBeenCalledWith({ ...filter, value: undefined });
     }
   });
 
@@ -289,7 +284,9 @@ const renderSearchField = (
       datasource={datasource}
       updateFilter={updateFilter}
       filter={filter}
-      setError={() => {}}
+      setError={function (error: FetchError): void {
+        throw error;
+      }}
       tags={tags || []}
       hideTag={hideTag}
       query={'{}'}

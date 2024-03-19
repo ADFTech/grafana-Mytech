@@ -7,7 +7,7 @@ import { RowOptionsModal } from './RowOptionsModal';
 
 export interface RowOptionsButtonProps {
   title: string;
-  repeat?: string;
+  repeat?: string | null;
   onUpdate: OnRowOptionsUpdate;
   warning?: React.ReactNode;
 }

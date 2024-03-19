@@ -11,13 +11,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/grafana/pkg/api/dtos"
-	"github.com/grafana/grafana/pkg/plugins"
 	"github.com/grafana/grafana/pkg/services/org/orgimpl"
 	"github.com/grafana/grafana/pkg/services/quota/quotaimpl"
 	"github.com/grafana/grafana/pkg/services/sqlstore"
@@ -26,7 +22,6 @@ import (
 	"github.com/grafana/grafana/pkg/services/user/userimpl"
 	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tests/testinfra"
-	"github.com/grafana/grafana/pkg/tests/testsuite"
 )
 
 const (
@@ -36,10 +31,6 @@ const (
 )
 
 var updateSnapshotFlag = false
-
-func TestMain(m *testing.M) {
-	testsuite.Run(m)
-}
 
 func TestIntegrationPlugins(t *testing.T) {
 	if testing.Short() {
@@ -117,13 +108,11 @@ func TestIntegrationPlugins(t *testing.T) {
 				require.Equal(t, tc.expStatus, resp.StatusCode)
 				b, err := io.ReadAll(resp.Body)
 				require.NoError(t, err)
-				var result dtos.PluginList
-				err = json.Unmarshal(b, &result)
-				require.NoError(t, err)
 
 				expResp := expectedResp(t, tc.expRespPath)
 
-				if diff := cmp.Diff(expResp, result, cmpopts.IgnoreFields(plugins.Info{}, "Version")); diff != "" {
+				same := assert.JSONEq(t, expResp, string(b))
+				if !same {
 					if updateSnapshotFlag {
 						t.Log("updating snapshot results")
 						var prettyJSON bytes.Buffer
@@ -132,7 +121,6 @@ func TestIntegrationPlugins(t *testing.T) {
 						}
 						updateRespSnapshot(t, tc.expRespPath, prettyJSON.String())
 					}
-					t.Errorf("unexpected response (-want +got):\n%s", diff)
 					t.FailNow()
 				}
 			})
@@ -230,19 +218,14 @@ func grafanaAPIURL(username string, grafanaListedAddr string, path string) strin
 	return fmt.Sprintf("http://%s:%s@%s/api/%s", username, defaultPassword, grafanaListedAddr, path)
 }
 
-func expectedResp(t *testing.T, filename string) dtos.PluginList {
+func expectedResp(t *testing.T, filename string) string {
 	//nolint:GOSEC
 	contents, err := os.ReadFile(filepath.Join("data", filename))
 	if err != nil {
 		t.Errorf("failed to load %s: %v", filename, err)
 	}
 
-	var result dtos.PluginList
-	err = json.Unmarshal(contents, &result)
-	if err != nil {
-		t.Errorf("failed to unmarshal %s: %v", filename, err)
-	}
-	return result
+	return string(contents)
 }
 
 func updateRespSnapshot(t *testing.T, filename string, body string) {

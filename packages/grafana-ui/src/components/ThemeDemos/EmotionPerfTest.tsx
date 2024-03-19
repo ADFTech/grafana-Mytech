@@ -1,6 +1,6 @@
 /** @jsxRuntime classic */
 /** @jsx jsx */
-import { css, cx } from '@emotion/css';
+import { css, CSSInterpolation, cx } from '@emotion/css';
 import { jsx } from '@emotion/react';
 import classnames from 'classnames';
 import { Profiler, ProfilerOnRenderCallback, useState, FC } from 'react';
@@ -126,7 +126,14 @@ function NoStyles({ index }: TestComponentProps) {
 }
 
 function MeasureRender({ children, id }: { children: React.ReactNode; id: string }) {
-  const onRender: ProfilerOnRenderCallback = (id, phase, actualDuration, baseDuration, startTime, commitTime) => {
+  const onRender: ProfilerOnRenderCallback = (
+    id: string,
+    phase: 'mount' | 'update',
+    actualDuration: number,
+    baseDuration: number,
+    startTime: number,
+    commitTime: number
+  ) => {
     console.log('Profile ' + id, actualDuration);
   };
 
@@ -167,7 +174,7 @@ const getStylesObjects = (theme: GrafanaTheme2) => {
   };
 };
 
-function getStylesObjectMain(theme: GrafanaTheme2) {
+function getStylesObjectMain(theme: GrafanaTheme2): CSSInterpolation {
   return {
     background: 'blue',
     border: '1px solid red',
@@ -180,12 +187,12 @@ function getStylesObjectMain(theme: GrafanaTheme2) {
   };
 }
 
-function getStylesObjectChild(theme: GrafanaTheme2) {
+function getStylesObjectChild(theme: GrafanaTheme2): CSSInterpolation {
   return {
     padding: '2px',
     fontSize: '10px',
     boxShadow: 'none',
     textAlign: 'center',
     textDecoration: 'none',
-  } as const;
+  };
 }

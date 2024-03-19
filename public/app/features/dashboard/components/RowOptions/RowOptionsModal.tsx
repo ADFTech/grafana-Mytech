@@ -7,7 +7,7 @@ import { OnRowOptionsUpdate, RowOptionsForm } from './RowOptionsForm';
 
 export interface RowOptionsModalProps {
   title: string;
-  repeat?: string;
+  repeat?: string | null;
   warning?: React.ReactNode;
   onDismiss: () => void;
   onUpdate: OnRowOptionsUpdate;

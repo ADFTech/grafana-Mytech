@@ -12,8 +12,9 @@ import {
   ScopedVars,
   urlUtil,
 } from '@grafana/data';
-import { NodeGraphOptions, SpanBarOptions } from '@grafana/o11y-ds-frontend';
 import { BackendSrvRequest, FetchResponse, getBackendSrv, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
+import { NodeGraphOptions } from 'app/core/components/NodeGraphSettings';
+import { SpanBarOptions } from 'app/features/explore/TraceView/components';
 
 import { apiPrefix } from './constants';
 import { ZipkinQuery, ZipkinSpan } from './types';
@@ -60,7 +61,7 @@ export class ZipkinDatasource extends DataSourceApi<ZipkinQuery, ZipkinJsonData>
     return of(emptyDataQueryResponse);
   }
 
-  async metadataRequest(url: string, params?: Record<string, unknown>) {
+  async metadataRequest(url: string, params?: Record<string, any>): Promise<any> {
     const res = await lastValueFrom(this.request(url, params, { hideFromInspector: true }));
     return res.data;
   }
@@ -99,7 +100,7 @@ export class ZipkinDatasource extends DataSourceApi<ZipkinQuery, ZipkinJsonData>
 
   private request<T = any>(
     apiUrl: string,
-    data?: unknown,
+    data?: any,
     options?: Partial<BackendSrvRequest>
   ): Observable<FetchResponse<T>> {
     const params = data ? urlUtil.serializeParams(data) : '';

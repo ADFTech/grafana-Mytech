@@ -1,17 +1,24 @@
 import { Observable } from 'rxjs';
 
-import { DataSourceInstanceSettings, DataSourceRef, getDataSourceRef, ScopedVars, AppEvents } from '@grafana/data';
-import { BackendDataSourceResponse, FetchResponse, getBackendSrv, TemplateSrv, getAppEvents } from '@grafana/runtime';
+import { DataSourceInstanceSettings, DataSourceRef, getDataSourceRef, ScopedVars } from '@grafana/data';
+import { BackendDataSourceResponse, FetchResponse, getBackendSrv } from '@grafana/runtime';
+import { notifyApp } from 'app/core/actions';
+import { createErrorNotification } from 'app/core/copy/appNotification';
+import { TemplateSrv } from 'app/features/templating/template_srv';
+import { store } from 'app/store/store';
+import { AppNotificationTimeout } from 'app/types';
 
 import memoizedDebounce from '../memoizedDebounce';
 import { CloudWatchJsonData, Dimensions, MetricRequest, MultiFilters } from '../types';
-import { getVariableName } from '../utils/templateVariableUtils';
 
 export abstract class CloudWatchRequest {
   templateSrv: TemplateSrv;
   ref: DataSourceRef;
   dsQueryEndpoint = '/api/ds/query';
-  debouncedCustomAlert: (title: string, message: string) => void = memoizedDebounce(displayCustomError);
+  debouncedCustomAlert: (title: string, message: string) => void = memoizedDebounce(
+    displayCustomError,
+    AppNotificationTimeout.Error
+  );
 
   constructor(
     public instanceSettings: DataSourceInstanceSettings<CloudWatchJsonData>,
@@ -36,18 +43,9 @@ export abstract class CloudWatchRequest {
     return getBackendSrv().fetch<BackendDataSourceResponse>(options);
   }
 
-  convertDimensionFormat(
-    dimensions: Dimensions,
-    scopedVars: ScopedVars,
-    displayErrorIfIsMultiTemplateVariable = true
-  ): Dimensions {
+  convertDimensionFormat(dimensions: Dimensions, scopedVars: ScopedVars): Dimensions {
     return Object.entries(dimensions).reduce((result, [key, value]) => {
-      key = this.replaceVariableAndDisplayWarningIfMulti(
-        key,
-        scopedVars,
-        displayErrorIfIsMultiTemplateVariable,
-        'dimension keys'
-      );
+      key = this.replaceVariableAndDisplayWarningIfMulti(key, scopedVars, true, 'dimension keys');
 
       if (Array.isArray(value)) {
         return { ...result, [key]: value };
@@ -64,7 +62,7 @@ export abstract class CloudWatchRequest {
 
   // get the value for a given template variable
   expandVariableToArray(value: string, scopedVars: ScopedVars): string[] {
-    const variableName = getVariableName(value);
+    const variableName = this.templateSrv.getVariableName(value);
     const valueVar = this.templateSrv.getVariables().find(({ name }) => {
       return name === variableName;
     });
@@ -95,35 +93,23 @@ export abstract class CloudWatchRequest {
     }, {});
   }
 
-  isMultiVariable(target?: string) {
-    if (target) {
-      const variables = this.templateSrv.getVariables();
-      const variable = variables.find(({ name }) => name === getVariableName(target));
-      const type = variable?.type;
-      return (type === 'custom' || type === 'query' || type === 'datasource') && variable?.multi;
-    }
-
-    return false;
-  }
-
-  isVariableWithMultipleOptionsSelected(target?: string, scopedVars?: ScopedVars) {
-    if (!target || !this.isMultiVariable(target)) {
-      return false;
-    }
-    return this.expandVariableToArray(target, scopedVars || {}).length > 1;
-  }
-
   replaceVariableAndDisplayWarningIfMulti(
     target?: string,
     scopedVars?: ScopedVars,
     displayErrorIfIsMultiTemplateVariable?: boolean,
     fieldName?: string
   ) {
-    if (displayErrorIfIsMultiTemplateVariable && this.isVariableWithMultipleOptionsSelected(target)) {
-      this.debouncedCustomAlert(
-        'CloudWatch templating error',
-        `Multi template variables are not supported for ${fieldName || target}`
-      );
+    if (displayErrorIfIsMultiTemplateVariable && !!target) {
+      const variables = this.templateSrv.getVariables();
+      const variable = variables.find(({ name }) => name === this.templateSrv.getVariableName(target));
+      const isMultiVariable =
+        variable?.type === 'custom' || variable?.type === 'query' || variable?.type === 'datasource';
+      if (isMultiVariable && variable.multi) {
+        this.debouncedCustomAlert(
+          'CloudWatch templating error',
+          `Multi template variables are not supported for ${fieldName || target}`
+        );
+      }
     }
 
     return this.templateSrv.replace(target, scopedVars);
@@ -142,7 +128,4 @@ export abstract class CloudWatchRequest {
 }
 
 const displayCustomError = (title: string, message: string) =>
-  getAppEvents().publish({
-    type: AppEvents.alertError.name,
-    payload: [title, message],
-  });
+  store.dispatch(notifyApp(createErrorNotification(title, message)));

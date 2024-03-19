@@ -5,7 +5,6 @@ import { GrafanaTheme2 } from '@grafana/data';
 import { selectors as e2eSelectors } from '@grafana/e2e-selectors';
 import { config, featureEnabled } from '@grafana/runtime';
 import { useStyles2, TabsBar, Tab } from '@grafana/ui';
-import { t } from 'app/core/internationalization';
 import { contextSrv } from 'app/core/services/context_srv';
 import { isPublicDashboardsEnabled } from 'app/features/dashboard/components/ShareModal/SharePublicDashboard/SharePublicDashboardUtils';
 
@@ -28,7 +27,7 @@ const selectors = e2eSelectors.pages.UserListPage;
 
 const PublicDashboardsTab = ({ view, setView }: { view: TabView | null; setView: (v: TabView | null) => void }) => (
   <Tab
-    label={t('users-access-list.tabs.public-dashboard-users-tab-title', 'Public dashboard users')}
+    label="Public dashboard users"
     active={view === TabView.PUBLIC_DASHBOARDS}
     onChangeTab={() => setView(TabView.PUBLIC_DASHBOARDS)}
     data-testid={selectors.tabs.publicDashboardsUsers}
@@ -79,7 +78,7 @@ export default function UserListPage() {
             onChangeTab={() => setView(TabView.ORG)}
             data-testid={selectors.tabs.orgUsers}
           />
-          {config.anonymousEnabled && (
+          {config.anonymousEnabled && config.featureToggles.displayAnonymousStats && (
             <Tab
               label="Anonymous devices"
               active={view === TabView.ANON}

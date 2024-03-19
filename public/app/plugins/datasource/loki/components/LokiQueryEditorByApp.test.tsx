@@ -4,7 +4,7 @@ import React from 'react';
 
 import { CoreApp } from '@grafana/data';
 
-import { createLokiDatasource } from '../__mocks__/datasource';
+import { createLokiDatasource } from '../mocks';
 
 import { testIds as regularTestIds } from './LokiQueryEditor';
 import { LokiQueryEditorByApp } from './LokiQueryEditorByApp';

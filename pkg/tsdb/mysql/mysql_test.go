@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/grafana/pkg/setting"
 	"github.com/grafana/grafana/pkg/tsdb/sqleng"
 )
 
@@ -36,13 +37,21 @@ func TestIntegrationMySQL(t *testing.T) {
 		t.Skip()
 	}
 
+	x := InitMySQLTestDB(t)
+
+	origDB := sqleng.NewDB
 	origInterpolate := sqleng.Interpolate
 	t.Cleanup(func() {
+		sqleng.NewDB = origDB
 		sqleng.Interpolate = origInterpolate
 	})
 
-	sqleng.Interpolate = func(query backend.DataQuery, timeRange backend.TimeRange, timeInterval string, sql string) string {
-		return sql
+	sqleng.NewDB = func(d, c string) (*sql.DB, error) {
+		return x, nil
+	}
+
+	sqleng.Interpolate = func(query backend.DataQuery, timeRange backend.TimeRange, timeInterval string, sql string) (string, error) {
+		return sql, nil
 	}
 
 	dsInfo := sqleng.DataSourceInfo{
@@ -54,6 +63,8 @@ func TestIntegrationMySQL(t *testing.T) {
 	}
 
 	config := sqleng.DataPluginConfiguration{
+		DriverName:        "mysql",
+		ConnectionString:  "",
 		DSInfo:            dsInfo,
 		TimeColumnNames:   []string{"time", "time_sec"},
 		MetricColumnTypes: []string{"CHAR", "VARCHAR", "TINYTEXT", "TEXT", "MEDIUMTEXT", "LONGTEXT"},
@@ -63,13 +74,11 @@ func TestIntegrationMySQL(t *testing.T) {
 	rowTransformer := mysqlQueryResultTransformer{}
 
 	logger := backend.NewLoggerWith("logger", "mysql.test")
-
-	db := InitMySQLTestDB(t, config.DSInfo.JsonData)
-
-	exe, err := sqleng.NewQueryDataHandler("", db, config, &rowTransformer, newMysqlMacroEngine(logger, ""), logger)
+	exe, err := sqleng.NewQueryDataHandler(setting.NewCfg(), config, &rowTransformer, newMysqlMacroEngine(logger, setting.NewCfg()), logger)
 
 	require.NoError(t, err)
 
+	db := x
 	fromStart := time.Date(2018, 3, 15, 13, 0, 0, 0, time.UTC)
 
 	t.Run("Given a table with different native data types", func(t *testing.T) {
@@ -329,8 +338,7 @@ func TestIntegrationMySQL(t *testing.T) {
 								"rawSql": "SELECT $__timeGroup(time, $__interval) AS time, avg(value) as value FROM metric GROUP BY 1 ORDER BY 1",
 								"format": "time_series"
 							}`),
-							RefID:    "A",
-							Interval: time.Second * 60,
+							RefID: "A",
 							TimeRange: backend.TimeRange{
 								From: fromStart,
 								To:   fromStart.Add(30 * time.Minute),
@@ -1170,6 +1178,8 @@ func TestIntegrationMySQL(t *testing.T) {
 		t.Run("When row limit set to 1", func(t *testing.T) {
 			dsInfo := sqleng.DataSourceInfo{}
 			config := sqleng.DataPluginConfiguration{
+				DriverName:        "mysql",
+				ConnectionString:  "",
 				DSInfo:            dsInfo,
 				TimeColumnNames:   []string{"time", "time_sec"},
 				MetricColumnTypes: []string{"CHAR", "VARCHAR", "TINYTEXT", "TEXT", "MEDIUMTEXT", "LONGTEXT"},
@@ -1178,7 +1188,7 @@ func TestIntegrationMySQL(t *testing.T) {
 
 			queryResultTransformer := mysqlQueryResultTransformer{}
 
-			handler, err := sqleng.NewQueryDataHandler("", db, config, &queryResultTransformer, newMysqlMacroEngine(logger, ""), logger)
+			handler, err := sqleng.NewQueryDataHandler(setting.NewCfg(), config, &queryResultTransformer, newMysqlMacroEngine(logger, setting.NewCfg()), logger)
 			require.NoError(t, err)
 
 			t.Run("When doing a table query that returns 2 rows should limit the result to 1 row", func(t *testing.T) {
@@ -1280,18 +1290,14 @@ func TestIntegrationMySQL(t *testing.T) {
 	})
 }
 
-func InitMySQLTestDB(t *testing.T, jsonData sqleng.JsonData) *sql.DB {
+func InitMySQLTestDB(t *testing.T) *sql.DB {
 	connStr := mySQLTestDBConnStr()
-	db, err := sql.Open("mysql", connStr)
+	x, err := sql.Open("mysql", connStr)
 	if err != nil {
 		t.Fatalf("Failed to init mysql db %v", err)
 	}
 
-	db.SetMaxOpenConns(jsonData.MaxOpenConns)
-	db.SetMaxIdleConns(jsonData.MaxIdleConns)
-	db.SetConnMaxLifetime(time.Duration(jsonData.ConnMaxLifetime) * time.Second)
-
-	return db
+	return x
 }
 
 func genTimeRangeByInterval(from time.Time, duration time.Duration, interval time.Duration) []time.Time {

@@ -1,14 +1,8 @@
 import { TestScheduler } from 'rxjs/testing';
 
-import { AlertState, DataTopic, getDefaultTimeRange, LoadingState, PanelData, toDataFrame } from '@grafana/data';
+import { AlertState, getDefaultTimeRange, LoadingState, PanelData, toDataFrame } from '@grafana/data';
 
 import { mergePanelAndDashData } from './mergePanelAndDashData';
-
-function toAnnotationFrame(data: Array<Record<string, string>>) {
-  let frame = toDataFrame(data);
-  frame.meta = { dataTopic: DataTopic.Annotations };
-  return frame;
-}
 
 function getTestContext() {
   const timeRange = getDefaultTimeRange();
@@ -40,7 +34,7 @@ describe('mergePanelAndDashboardData', () => {
           a: {
             state: LoadingState.Done,
             series: [],
-            annotations: [toAnnotationFrame([{ id: 'panelData' }]), toAnnotationFrame([{ id: 'dashData' }])],
+            annotations: [toDataFrame([{ id: 'panelData' }]), toDataFrame([{ id: 'dashData' }])],
             timeRange,
           },
         });
@@ -69,7 +63,7 @@ describe('mergePanelAndDashboardData', () => {
           a: {
             state: LoadingState.Done,
             series: [],
-            annotations: [toAnnotationFrame([{ id: 'panelData' }]), toAnnotationFrame([])],
+            annotations: [toDataFrame([{ id: 'panelData' }]), toDataFrame([])],
             alertState: { id: 1, state: AlertState.OK, dashboardId: 1, panelId: 1, newStateDate: '' },
             timeRange,
           },
@@ -98,7 +92,7 @@ describe('mergePanelAndDashboardData', () => {
           a: {
             state: LoadingState.Done,
             series: [],
-            annotations: [toAnnotationFrame([{ id: 'panelData' }])],
+            annotations: [toDataFrame([{ id: 'panelData' }])],
             timeRange,
           },
         });

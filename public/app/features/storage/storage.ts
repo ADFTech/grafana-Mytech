@@ -102,9 +102,9 @@ class SimpleStorage implements GrafanaStorage {
       body: formData,
     });
 
-    let body = await res.json();
+    let body: UploadResponse = await res.json();
     if (!body) {
-      body = {};
+      body = {} as any;
     }
     body.status = res.status;
     body.statusText = res.statusText;

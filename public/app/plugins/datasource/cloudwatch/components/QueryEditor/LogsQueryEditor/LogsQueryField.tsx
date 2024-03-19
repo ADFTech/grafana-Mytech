@@ -18,7 +18,7 @@ export interface CloudWatchLogsQueryFieldProps
   ExtraFieldElement?: ReactNode;
   query: CloudWatchLogsQuery;
 }
-export const CloudWatchLogsQueryField = (props: CloudWatchLogsQueryFieldProps) => {
+export const CloudWatchLogsQueryFieldMonaco = (props: CloudWatchLogsQueryFieldProps) => {
   const { query, datasource, onChange, ExtraFieldElement, data } = props;
 
   const showError = data?.error?.refId === query.refId;
@@ -141,4 +141,4 @@ export const CloudWatchLogsQueryField = (props: CloudWatchLogsQueryFieldProps) =
   );
 };
 
-export default withTheme2(CloudWatchLogsQueryField);
+export default withTheme2(CloudWatchLogsQueryFieldMonaco);

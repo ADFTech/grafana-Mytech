@@ -62,7 +62,7 @@ export const UserRolePicker = ({
         return pendingRoles;
       }
 
-      if (contextSrv.hasPermission(AccessControlAction.ActionUserRolesList) && userId > 0) {
+      if (contextSrv.hasPermission(AccessControlAction.ActionUserRolesList)) {
         return await fetchUserRoles(userId, orgId);
       }
     } catch (e) {

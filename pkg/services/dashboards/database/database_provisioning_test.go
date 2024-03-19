@@ -25,6 +25,7 @@ func TestIntegrationDashboardProvisioningTest(t *testing.T) {
 
 	folderCmd := dashboards.SaveDashboardCommand{
 		OrgID:     1,
+		FolderID:  0, // nolint:staticcheck
 		FolderUID: "",
 		IsFolder:  true,
 		Dashboard: simplejson.NewFromAny(map[string]any{
@@ -39,10 +40,11 @@ func TestIntegrationDashboardProvisioningTest(t *testing.T) {
 	saveDashboardCmd := dashboards.SaveDashboardCommand{
 		OrgID:     1,
 		IsFolder:  false,
+		FolderID:  dash.ID, // nolint:staticcheck
 		FolderUID: dash.UID,
 		Dashboard: simplejson.NewFromAny(map[string]any{
 			"id":    nil,
-			"title": "test dashboard 2",
+			"title": "test dashboard",
 		}),
 	}
 
@@ -65,6 +67,7 @@ func TestIntegrationDashboardProvisioningTest(t *testing.T) {
 			saveCmd := dashboards.SaveDashboardCommand{
 				OrgID:     1,
 				IsFolder:  false,
+				FolderID:  dash.ID, // nolint:staticcheck
 				FolderUID: dash.UID,
 				Dashboard: simplejson.NewFromAny(map[string]any{
 					"id":    nil,

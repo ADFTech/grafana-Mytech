@@ -4,13 +4,14 @@
 //     public/app/plugins/gen.go
 // Using jennies:
 //     TSTypesJenny
-//     PluginTsTypesJenny
+//     LatestMajorsOrXJenny
+//     PluginEachMajorJenny
 //
 // Run 'make gen-cue' from repository root to regenerate.
 
 import * as common from '@grafana/schema';
 
-export const pluginVersion = "%VERSION%";
+export const pluginVersion = "10.3.0-pre";
 
 export type PyroscopeQueryType = ('metrics' | 'profile' | 'both');
 

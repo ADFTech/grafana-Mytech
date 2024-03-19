@@ -48,7 +48,6 @@ composableKinds: PanelCfg: {
 				} @cuetsy(kind="interface")
 				Options: {
 					common.OptionsWithLegend
-					common.OptionsWithTooltip
 
 					// Sets which dimensions are used for the visualization
 					mode: VizDisplayMode & (*"candles+volume" | _)

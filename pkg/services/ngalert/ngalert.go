@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/benbjohnson/clock"
-	"github.com/prometheus/alertmanager/featurecontrol"
-	"github.com/prometheus/alertmanager/matchers/compat"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/grafana/grafana/pkg/api/routing"
@@ -26,10 +24,12 @@ import (
 	"github.com/grafana/grafana/pkg/services/datasources"
 	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/services/folder"
+	"github.com/grafana/grafana/pkg/services/guardian"
 	"github.com/grafana/grafana/pkg/services/ngalert/api"
 	"github.com/grafana/grafana/pkg/services/ngalert/eval"
 	"github.com/grafana/grafana/pkg/services/ngalert/image"
 	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
+	"github.com/grafana/grafana/pkg/services/ngalert/migration"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/ngalert/notifier"
 	"github.com/grafana/grafana/pkg/services/ngalert/provisioning"
@@ -71,6 +71,10 @@ func ProvideService(
 	pluginsStore pluginstore.Store,
 	tracer tracing.Tracer,
 	ruleStore *store.DBstore,
+	upgradeService migration.UpgradeService,
+
+	// This is necessary to ensure the guardian provider is initialized before we run the migration.
+	_ *guardian.Provider,
 ) (*AlertNG, error) {
 	ng := &AlertNG{
 		Cfg:                  cfg,
@@ -97,9 +101,17 @@ func ProvideService(
 		pluginsStore:         pluginsStore,
 		tracer:               tracer,
 		store:                ruleStore,
+		upgradeService:       upgradeService,
 	}
 
-	if ng.IsDisabled() {
+	// Migration is called even if UA is disabled. If UA is disabled, this will do nothing except handle logic around
+	// reverting the migration.
+	err := ng.upgradeService.Run(context.Background())
+	if err != nil {
+		return nil, err
+	}
+
+	if !ng.shouldRun() {
 		return ng, nil
 	}
 
@@ -145,6 +157,8 @@ type AlertNG struct {
 	bus          bus.Bus
 	pluginsStore pluginstore.Store
 	tracer       tracing.Tracer
+
+	upgradeService migration.UpgradeService
 }
 
 func (ng *AlertNG) init() error {
@@ -153,12 +167,6 @@ func (ng *AlertNG) init() error {
 	defer cancelFunc()
 
 	ng.store.Logger = ng.Log
-
-	// This initializes the compat package in fallback mode with logging. It parses first
-	// using the UTF-8 parser and then fallsback to the classic parser on error.
-	// UTF-8 is permitted in label names. This should be removed when the compat package
-	// is removed from Alertmanager.
-	compat.InitFromFlags(ng.Log, featurecontrol.NoopFlags{})
 
 	// If enabled, configure the remote Alertmanager.
 	// - If several toggles are enabled, the order of precedence is RemoteOnly, RemotePrimary, RemoteSecondary
@@ -177,9 +185,6 @@ func (ng *AlertNG) init() error {
 
 		case remoteSecondary:
 			ng.Log.Debug("Starting Grafana with remote secondary mode enabled")
-			m := ng.Metrics.GetRemoteAlertmanagerMetrics()
-			m.Info.WithLabelValues(metrics.ModeRemoteSecondary).Set(1)
-
 			// This function will be used by the MOA to create new Alertmanagers.
 			override := notifier.WithAlertmanagerOverride(func(factoryFn notifier.OrgAlertmanagerFactory) notifier.OrgAlertmanagerFactory {
 				return func(ctx context.Context, orgID int64) (notifier.Alertmanager, error) {
@@ -190,7 +195,7 @@ func (ng *AlertNG) init() error {
 					}
 
 					// Create remote Alertmanager.
-					remoteAM, err := createRemoteAlertmanager(orgID, ng.Cfg.UnifiedAlerting.RemoteAlertmanager, ng.KVStore, m)
+					remoteAM, err := createRemoteAlertmanager(orgID, ng.Cfg.UnifiedAlerting.RemoteAlertmanager, ng.KVStore)
 					if err != nil {
 						moaLogger.Error("Failed to create remote Alertmanager, falling back to using only the internal one", "err", err)
 						return internalAM, nil
@@ -216,7 +221,7 @@ func (ng *AlertNG) init() error {
 
 	decryptFn := ng.SecretsService.GetDecryptedValue
 	multiOrgMetrics := ng.Metrics.GetMultiOrgAlertmanagerMetrics()
-	moa, err := notifier.NewMultiOrgAlertmanager(ng.Cfg, ng.store, ng.store, ng.KVStore, ng.store, decryptFn, multiOrgMetrics, ng.NotificationService, moaLogger, ng.SecretsService, ng.FeatureToggles, overrides...)
+	moa, err := notifier.NewMultiOrgAlertmanager(ng.Cfg, ng.store, ng.store, ng.KVStore, ng.store, decryptFn, multiOrgMetrics, ng.NotificationService, moaLogger, ng.SecretsService, overrides...)
 	if err != nil {
 		return err
 	}
@@ -258,7 +263,6 @@ func (ng *AlertNG) init() error {
 		BaseInterval:         ng.Cfg.UnifiedAlerting.BaseInterval,
 		MinRuleInterval:      ng.Cfg.UnifiedAlerting.MinInterval,
 		DisableGrafanaFolder: ng.Cfg.UnifiedAlerting.ReservedLabels.IsReservedLabelDisabled(models.FolderTitleLabel),
-		JitterEvaluations:    schedule.JitterStrategyFrom(ng.Cfg.UnifiedAlerting, ng.FeatureToggles),
 		AppURL:               appUrl,
 		EvaluatorFactory:     evalFactory,
 		RuleStore:            ng.store,
@@ -283,19 +287,12 @@ func (ng *AlertNG) init() error {
 		Clock:                          clk,
 		Historian:                      history,
 		DoNotSaveNormalState:           ng.FeatureToggles.IsEnabledGlobally(featuremgmt.FlagAlertingNoNormalState),
-		ApplyNoDataAndErrorToAllStates: ng.FeatureToggles.IsEnabledGlobally(featuremgmt.FlagAlertingNoDataErrorExecution),
 		MaxStateSaveConcurrency:        ng.Cfg.UnifiedAlerting.MaxStateSaveConcurrency,
-		RulesPerRuleGroupLimit:         ng.Cfg.UnifiedAlerting.RulesPerRuleGroupLimit,
+		ApplyNoDataAndErrorToAllStates: ng.FeatureToggles.IsEnabledGlobally(featuremgmt.FlagAlertingNoDataErrorExecution),
 		Tracer:                         ng.tracer,
 		Log:                            log.New("ngalert.state.manager"),
 	}
-	logger := log.New("ngalert.state.manager.persist")
-	statePersister := state.NewSyncStatePersisiter(logger, cfg)
-	if ng.FeatureToggles.IsEnabledGlobally(featuremgmt.FlagAlertingSaveStatePeriodic) {
-		ticker := clock.New().Ticker(ng.Cfg.UnifiedAlerting.StatePeriodicSaveInterval)
-		statePersister = state.NewAsyncStatePersister(logger, ticker, cfg)
-	}
-	stateManager := state.NewManager(cfg, statePersister)
+	stateManager := state.NewManager(cfg)
 	scheduler := schedule.NewScheduler(schedCfg, stateManager)
 
 	// if it is required to include folder title to the alerts, we need to subscribe to changes of alert title
@@ -306,17 +303,14 @@ func (ng *AlertNG) init() error {
 	ng.stateManager = stateManager
 	ng.schedule = scheduler
 
-	receiverService := notifier.NewReceiverService(ng.accesscontrol, ng.store, ng.store, ng.SecretsService, ng.store, ng.Log)
-
 	// Provisioning
 	policyService := provisioning.NewNotificationPolicyService(ng.store, ng.store, ng.store, ng.Cfg.UnifiedAlerting, ng.Log)
-	contactPointService := provisioning.NewContactPointService(ng.store, ng.SecretsService, ng.store, ng.store, receiverService, ng.Log, ng.store)
+	contactPointService := provisioning.NewContactPointService(ng.store, ng.SecretsService, ng.store, ng.store, ng.Log, ng.accesscontrol)
 	templateService := provisioning.NewTemplateService(ng.store, ng.store, ng.store, ng.Log)
 	muteTimingService := provisioning.NewMuteTimingService(ng.store, ng.store, ng.store, ng.Log)
-	alertRuleService := provisioning.NewAlertRuleService(ng.store, ng.store, ng.folderService, ng.dashboardService, ng.QuotaService, ng.store,
+	alertRuleService := provisioning.NewAlertRuleService(ng.store, ng.store, ng.dashboardService, ng.QuotaService, ng.store,
 		int64(ng.Cfg.UnifiedAlerting.DefaultRuleEvaluationInterval.Seconds()),
-		int64(ng.Cfg.UnifiedAlerting.BaseInterval.Seconds()),
-		ng.Cfg.UnifiedAlerting.RulesPerRuleGroupLimit, ng.Log, notifier.NewNotificationSettingsValidationService(ng.store))
+		int64(ng.Cfg.UnifiedAlerting.BaseInterval.Seconds()), ng.Log)
 
 	ng.api = &api.API{
 		Cfg:                  ng.Cfg,
@@ -334,7 +328,6 @@ func (ng *AlertNG) init() error {
 		StateManager:         ng.stateManager,
 		AccessControl:        ng.accesscontrol,
 		Policies:             policyService,
-		ReceiverService:      receiverService,
 		ContactPointService:  contactPointService,
 		Templates:            templateService,
 		MuteTimings:          muteTimingService,
@@ -378,8 +371,16 @@ func subscribeToFolderChanges(logger log.Logger, bus bus.Bus, dbStore api.RuleSt
 	})
 }
 
+// shouldRun determines if AlertNG should init or run anything more than just the migration.
+func (ng *AlertNG) shouldRun() bool {
+	return ng.Cfg.UnifiedAlerting.IsEnabled()
+}
+
 // Run starts the scheduler and Alertmanager.
 func (ng *AlertNG) Run(ctx context.Context) error {
+	if !ng.shouldRun() {
+		return nil
+	}
 	ng.Log.Debug("Starting", "execute_alerts", ng.Cfg.UnifiedAlerting.ExecuteAlerts)
 
 	children, subCtx := errgroup.WithContext(ctx)
@@ -406,20 +407,13 @@ func (ng *AlertNG) Run(ctx context.Context) error {
 		children.Go(func() error {
 			return ng.schedule.Run(subCtx)
 		})
-		children.Go(func() error {
-			return ng.stateManager.Run(subCtx)
-		})
 	}
 	return children.Wait()
 }
 
 // IsDisabled returns true if the alerting service is disabled for this instance.
 func (ng *AlertNG) IsDisabled() bool {
-	if ng.Cfg == nil {
-		return true
-	}
-
-	return !ng.Cfg.UnifiedAlerting.IsEnabled()
+	return ng.Cfg == nil
 }
 
 // GetHooks returns a facility for replacing handlers for paths. The handler hook for a path
@@ -535,7 +529,7 @@ func ApplyStateHistoryFeatureToggles(cfg *setting.UnifiedAlertingStateHistorySet
 	}
 }
 
-func createRemoteAlertmanager(orgID int64, amCfg setting.RemoteAlertmanagerSettings, kvstore kvstore.KVStore, m *metrics.RemoteAlertmanager) (*remote.Alertmanager, error) {
+func createRemoteAlertmanager(orgID int64, amCfg setting.RemoteAlertmanagerSettings, kvstore kvstore.KVStore) (*remote.Alertmanager, error) {
 	externalAMCfg := remote.AlertmanagerConfig{
 		OrgID:             orgID,
 		URL:               amCfg.URL,
@@ -544,5 +538,5 @@ func createRemoteAlertmanager(orgID int64, amCfg setting.RemoteAlertmanagerSetti
 	}
 	// We won't be handling files on disk, we can pass an empty string as workingDirPath.
 	stateStore := notifier.NewFileStore(orgID, kvstore, "")
-	return remote.NewAlertmanager(externalAMCfg, stateStore, m)
+	return remote.NewAlertmanager(externalAMCfg, stateStore)
 }

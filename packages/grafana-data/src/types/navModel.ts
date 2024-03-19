@@ -26,8 +26,6 @@ export interface NavLinkDTO {
   pluginId?: string;
   // Whether the page is used to create a new resource. We may place these in a different position in the UI.
   isCreateAction?: boolean;
-  // Optional keywords to match on when searching (e.g. in the CommandPalette)
-  keywords?: string[];
 }
 
 export interface NavModelItem extends NavLinkDTO {

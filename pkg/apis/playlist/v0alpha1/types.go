@@ -2,6 +2,21 @@ package v0alpha1
 
 import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/grafana/grafana/pkg/apis"
+)
+
+const (
+	GROUP      = "playlist.grafana.app"
+	VERSION    = "v0alpha1"
+	APIVERSION = GROUP + "/" + VERSION
+)
+
+var PlaylistResourceInfo = apis.NewResourceInfo(GROUP, VERSION,
+	"playlists", "playlist", "Playlist",
+	func() runtime.Object { return &Playlist{} },
+	func() runtime.Object { return &PlaylistList{} },
 )
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
@@ -36,16 +51,12 @@ type Spec struct {
 	Items []Item `json:"items,omitempty"`
 }
 
-// Type of the item.
-// +enum
-type ItemType string
-
 // Defines values for ItemType.
 const (
 	ItemTypeDashboardByTag ItemType = "dashboard_by_tag"
 	ItemTypeDashboardByUid ItemType = "dashboard_by_uid"
 
-	// Deprecated -- should use UID
+	// deprecated -- should use UID
 	ItemTypeDashboardById ItemType = "dashboard_by_id"
 )
 
@@ -64,3 +75,6 @@ type Item struct {
 	//  - dashboard_by_uid: The value is the dashboard UID
 	Value string `json:"value"`
 }
+
+// Type of the item.
+type ItemType string

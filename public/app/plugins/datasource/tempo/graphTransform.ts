@@ -10,7 +10,8 @@ import {
   FieldType,
   toDataFrame,
 } from '@grafana/data';
-import { getNonOverlappingDuration, getStats, makeFrames, makeSpanMap } from '@grafana/o11y-ds-frontend';
+
+import { getNonOverlappingDuration, getStats, makeFrames, makeSpanMap } from '../../../core/utils/tracing';
 
 /**
  * Row in a trace dataFrame
@@ -138,13 +139,11 @@ export const failedMetric = 'traces_service_graph_request_failed_total';
 export const histogramMetric = 'traces_service_graph_request_server_seconds_bucket';
 
 export const rateMetric = {
-  expr: 'sum(rate(traces_spanmetrics_calls_total{}[$__range])) by (span_name)',
-  topk: 5,
+  expr: 'topk(5, sum(rate(traces_spanmetrics_calls_total{}[$__range])) by (span_name))',
   params: [],
 };
 export const errorRateMetric = {
-  expr: 'sum(rate(traces_spanmetrics_calls_total{}[$__range])) by (span_name)',
-  topk: 5,
+  expr: 'topk(5, sum(rate(traces_spanmetrics_calls_total{}[$__range])) by (span_name))',
   params: ['status_code="STATUS_CODE_ERROR"'],
 };
 export const durationMetric = {
@@ -309,7 +308,7 @@ function collectMetricData(
   }
 
   // The name of the value column is in this format
-  // Improvement: figure out if it can be changed
+  // TODO figure out if it can be changed
   const valueName = `Value #${metric}`;
 
   for (let i = 0; i < frame.length; i++) {

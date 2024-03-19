@@ -1,4 +1,4 @@
-import { initialCustomVariableModelState } from '../__mocks__/variables';
+import { initialCustomVariableModelState } from 'app/features/variables/custom/reducer';
 
 import { hasOption, interpolateVariable } from './common';
 

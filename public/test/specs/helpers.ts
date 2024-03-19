@@ -101,7 +101,7 @@ export function ControllerTestContext(this: any) {
     });
   };
 
-  this.setIsUtc = (isUtc = false) => {
+  this.setIsUtc = (isUtc: any = false) => {
     self.isUtc = isUtc;
   };
 }

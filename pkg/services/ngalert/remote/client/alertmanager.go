@@ -9,8 +9,6 @@ import (
 
 	httptransport "github.com/go-openapi/runtime/client"
 	"github.com/grafana/grafana/pkg/infra/log"
-	"github.com/grafana/grafana/pkg/services/ngalert/client"
-	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
 	amclient "github.com/prometheus/alertmanager/api/v2/client"
 )
 
@@ -26,12 +24,12 @@ type AlertmanagerConfig struct {
 
 type Alertmanager struct {
 	*amclient.AlertmanagerAPI
-	httpClient client.Requester
+	httpClient *http.Client
 	url        *url.URL
 	logger     log.Logger
 }
 
-func NewAlertmanager(cfg *AlertmanagerConfig, metrics *metrics.RemoteAlertmanager) (*Alertmanager, error) {
+func NewAlertmanager(cfg *AlertmanagerConfig) (*Alertmanager, error) {
 	// First, add the authentication middleware.
 	c := &http.Client{Transport: &MimirAuthRoundTripper{
 		TenantID: cfg.TenantID,
@@ -39,27 +37,23 @@ func NewAlertmanager(cfg *AlertmanagerConfig, metrics *metrics.RemoteAlertmanage
 		Next:     http.DefaultTransport,
 	}}
 
-	tc := client.NewTimedClient(c, metrics.RequestLatency)
 	apiEndpoint := *cfg.URL
 
 	// Next, make sure you set the right path.
 	u := apiEndpoint.JoinPath(alertmanagerAPIMountPath, amclient.DefaultBasePath)
-
-	// Create an Alertmanager client using the timed client as the transport.
-	r := httptransport.New(u.Host, u.Path, []string{u.Scheme})
-	r.Transport = tc
+	transport := httptransport.NewWithClient(u.Host, u.Path, []string{u.Scheme}, c)
 
 	return &Alertmanager{
 		logger:          cfg.Logger,
 		url:             cfg.URL,
-		AlertmanagerAPI: amclient.New(r, nil),
-		httpClient:      tc,
+		AlertmanagerAPI: amclient.New(transport, nil),
+		httpClient:      c,
 	}, nil
 }
 
-// GetAuthedClient returns a client.Requester that includes a configured MimirAuthRoundTripper.
+// GetAuthedClient returns a *http.Client that includes a configured MimirAuthRoundTripper.
 // Requests using this client are fully authenticated.
-func (am *Alertmanager) GetAuthedClient() client.Requester {
+func (am *Alertmanager) GetAuthedClient() *http.Client {
 	return am.httpClient
 }
 
@@ -107,10 +101,6 @@ func (am *Alertmanager) IsReadyWithBackoff(ctx context.Context) (bool, error) {
 			}
 
 			if status != http.StatusOK {
-				if status >= 400 && status < 500 {
-					am.logger.Debug("Ready check failed with non-retriable status code", "attempt", attempts, "status", status)
-					return false, fmt.Errorf("ready check failed with non-retriable status code %d", status)
-				}
 				am.logger.Debug("Ready check failed, status code is not 200", "attempt", attempts, "status", status, "err", err)
 				continue
 			}

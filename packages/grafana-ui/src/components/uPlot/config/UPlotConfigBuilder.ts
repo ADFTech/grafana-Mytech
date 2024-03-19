@@ -1,8 +1,17 @@
 import { merge } from 'lodash';
 import uPlot, { Cursor, Band, Hooks, Select, AlignedData, Padding, Series } from 'uplot';
 
-import { DataFrame, DefaultTimeZone, Field, getTimeZoneInfo, GrafanaTheme2, TimeRange, TimeZone } from '@grafana/data';
-import { AxisPlacement, VizOrientation } from '@grafana/schema';
+import {
+  DataFrame,
+  DefaultTimeZone,
+  EventBus,
+  Field,
+  getTimeZoneInfo,
+  GrafanaTheme2,
+  TimeRange,
+  TimeZone,
+} from '@grafana/data';
+import { AxisPlacement } from '@grafana/schema';
 
 import { FacetedData, PlotConfig, PlotTooltipInterpolator } from '../types';
 import { DEFAULT_PLOT_CONFIG, getStackingBands, pluginLog, StackingGroup } from '../utils';
@@ -48,8 +57,6 @@ export class UPlotConfigBuilder {
   // Custom handler for closest datapoint and series lookup
   private tooltipInterpolator: PlotTooltipInterpolator | undefined = undefined;
   private padding?: Padding = undefined;
-
-  private cachedConfig?: PlotConfig;
 
   prepData: PrepData | undefined = undefined;
 
@@ -183,10 +190,6 @@ export class UPlotConfigBuilder {
   }
 
   getConfig() {
-    if (this.cachedConfig) {
-      return this.cachedConfig;
-    }
-
     const config: PlotConfig = {
       ...DEFAULT_PLOT_CONFIG,
       mode: this.mode,
@@ -241,17 +244,17 @@ export class UPlotConfigBuilder {
       config.padding = this.padding;
     }
 
-    this.stackingGroups.forEach((group) => {
-      getStackingBands(group).forEach((band) => {
-        this.addBand(band);
+    if (this.stackingGroups.length) {
+      this.stackingGroups.forEach((group) => {
+        getStackingBands(group).forEach((band) => {
+          this.addBand(band);
+        });
       });
-    });
+    }
 
     if (this.bands.length) {
       config.bands = this.bands;
     }
-
-    this.cachedConfig = config;
 
     return config;
   }
@@ -297,14 +300,13 @@ type UPlotConfigPrepOpts<T extends Record<string, unknown> = {}> = {
   theme: GrafanaTheme2;
   timeZones: TimeZone[];
   getTimeRange: () => TimeRange;
+  eventBus: EventBus;
   allFrames: DataFrame[];
   renderers?: Renderers;
   tweakScale?: (opts: ScaleProps, forField: Field) => ScaleProps;
   tweakAxis?: (opts: AxisProps, forField: Field) => AxisProps;
   // Identifies the shared key for uPlot cursor sync
   eventsScope?: string;
-  hoverProximity?: number;
-  orientation?: VizOrientation;
 } & T;
 
 /** @alpha */

@@ -27,12 +27,6 @@ export const PermissionList = ({ title, items, compareKey, permissionLevels, can
 
       if (item.actions.length > keep[key].actions.length) {
         keep[key] = item;
-        continue;
-      }
-
-      // If the same permission has been inherited and applied directly, keep the one that is applied directly
-      if (item.actions.length === keep[key].actions.length && !item.isInherited) {
-        keep[key] = item;
       }
     }
     return Object.keys(keep).map((k) => keep[k]);

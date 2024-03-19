@@ -8,7 +8,7 @@ import (
 )
 
 func TestFeatureUsageStats(t *testing.T) {
-	featureManagerWithAllFeatures := WithManager(
+	featureManagerWithAllFeatures := WithFeatures(
 		"database_metrics",
 		"live-config",
 		"UPPER_SNAKE_CASE",

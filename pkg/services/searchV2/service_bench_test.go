@@ -19,12 +19,7 @@ import (
 	"github.com/grafana/grafana/pkg/services/store"
 	"github.com/grafana/grafana/pkg/services/user"
 	"github.com/grafana/grafana/pkg/setting"
-	"github.com/grafana/grafana/pkg/tests/testsuite"
 )
-
-func TestMain(m *testing.M) {
-	testsuite.Run(m)
-}
 
 // setupBenchEnv will set up a database with folderCount folders and dashboardsPerFolder dashboards per folder
 // It will also set up and run the search service
@@ -139,16 +134,16 @@ func populateDB(folderCount, dashboardsPerFolder int, sqlStore *sqlstore.SQLStor
 
 		for u := start; u < end; u++ {
 			dashID := int64(u + offset)
-			folderUID := fmt.Sprintf("folder%v", int64((u+offset)%folderCount+1))
+			folderID := int64((u+offset)%folderCount + 1)
 			dbs = append(dbs, dashboards.Dashboard{
-				ID:        dashID,
-				UID:       fmt.Sprintf("dashboard%v", dashID),
-				Title:     fmt.Sprintf("dashboard%v", dashID),
-				IsFolder:  false,
-				FolderUID: folderUID,
-				OrgID:     1,
-				Created:   now,
-				Updated:   now,
+				ID:       dashID,
+				UID:      fmt.Sprintf("dashboard%v", dashID),
+				Title:    fmt.Sprintf("dashboard%v", dashID),
+				IsFolder: false,
+				FolderID: folderID, // nolint:staticcheck
+				OrgID:    1,
+				Created:  now,
+				Updated:  now,
 			})
 		}
 

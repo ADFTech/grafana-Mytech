@@ -1,8 +1,9 @@
 import React from 'react';
 
-import { ConfigDescriptionLink, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSubSection } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
 import { Badge, InlineField, InlineFieldRow, Input } from '@grafana/ui';
+import { ConfigDescriptionLink } from 'app/core/components/ConfigDescriptionLink';
 
 type Props = {
   maxLines: string;

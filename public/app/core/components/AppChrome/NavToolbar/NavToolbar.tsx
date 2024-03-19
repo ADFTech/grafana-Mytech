@@ -62,6 +62,7 @@ export function NavToolbar({
       <Breadcrumbs breadcrumbs={breadcrumbs} className={styles.breadcrumbsWrapper} />
       <div className={styles.actions}>
         {actions}
+        {actions && <NavToolbarSeparator />}
         {searchBarHidden && (
           <ToolbarButton
             onClick={onToggleKioskMode}
@@ -70,7 +71,6 @@ export function NavToolbar({
             icon="monitor"
           />
         )}
-        {actions && <NavToolbarSeparator />}
         <ToolbarButton
           onClick={onToggleSearchBar}
           narrow
@@ -97,7 +97,6 @@ const getStyles = (theme: GrafanaTheme2) => {
       display: 'flex',
       padding: theme.spacing(0, 1, 0, 2),
       alignItems: 'center',
-      borderBottom: `1px solid ${theme.colors.border.weak}`,
     }),
     menuButton: css({
       display: 'flex',
@@ -112,7 +111,7 @@ const getStyles = (theme: GrafanaTheme2) => {
       justifyContent: 'flex-end',
       paddingLeft: theme.spacing(1),
       flexGrow: 1,
-      gap: theme.spacing(1),
+      gap: theme.spacing(0.5),
       minWidth: 0,
 
       '.body-drawer-open &': {

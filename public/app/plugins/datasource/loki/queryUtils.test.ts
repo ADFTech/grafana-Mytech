@@ -1,6 +1,6 @@
 import { String } from '@grafana/lezer-logql';
 
-import { createLokiDatasource } from './__mocks__/datasource';
+import { createLokiDatasource } from './mocks';
 import {
   getHighlighterExpressionsFromQuery,
   getLokiQueryType,

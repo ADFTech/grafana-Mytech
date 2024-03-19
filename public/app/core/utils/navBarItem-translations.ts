@@ -1,3 +1,4 @@
+import { config } from '@grafana/runtime';
 import { t } from 'app/core/internationalization';
 
 // Maps the ID of the nav item to a translated phrase to later pass to <Trans />
@@ -56,14 +57,10 @@ export function getNavTitle(navId: string | undefined) {
       return t('nav.oncall.title', 'OnCall');
     case 'alerting-legacy':
       return t('nav.alerting-legacy.title', 'Alerting (legacy)');
-    case 'alerting-upgrade':
-      return t('nav.alerting-upgrade.title', 'Alerting upgrade');
     case 'alert-home':
       return t('nav.alerting-home.title', 'Home');
     case 'alert-list':
       return t('nav.alerting-list.title', 'Alert rules');
-    case 'alert-list-legacy':
-      return t('nav.alert-list-legacy.title', 'Alert rules');
     case 'receivers':
       return t('nav.alerting-receivers.title', 'Contact points');
     case 'am-routes':
@@ -118,8 +115,6 @@ export function getNavTitle(navId: string | undefined) {
       return t('nav.server-settings.title', 'Settings');
     case 'storage':
       return t('nav.storage.title', 'Storage');
-    case 'migrate-to-cloud':
-      return t('nav.migrate-to-cloud.title', 'Migrate to Grafana Cloud');
     case 'upgrading':
       return t('nav.upgrading.title', 'Stats and license');
     case 'monitoring':
@@ -141,7 +136,9 @@ export function getNavTitle(navId: string | undefined) {
     case 'plugin-page-grafana-slo-app':
       return t('nav.slo.title', 'SLO');
     case 'plugin-page-k6-app':
-      return t('nav.k6.title', 'Performance');
+      return config.featureToggles.dockedMegaMenu
+        ? t('nav.k6.title', 'Performance')
+        : t('nav.performance-testing.title', 'Performance testing');
     case 'monitoring':
       return t('nav.observability.title', 'Observability');
     case 'plugin-page-grafana-k8s-app':
@@ -170,16 +167,12 @@ export function getNavTitle(navId: string | undefined) {
       return t('nav.connections.title', 'Connections');
     case 'connections-add-new-connection':
       return t('nav.add-new-connections.title', 'Add new connection');
-    case 'standalone-plugin-page-/connections/collector':
-      return t('nav.collector.title', 'Collector');
     case 'connections-datasources':
       return t('nav.data-sources.title', 'Data sources');
     case 'standalone-plugin-page-/connections/infrastructure':
       return t('nav.integrations.title', 'Integrations');
     case 'standalone-plugin-page-/connections/connect-data':
       return t('nav.connect-data.title', 'Connect data');
-    case 'standalone-plugin-page-/connections/private-data-source-connections':
-      return t('nav.private-data-source-connections.title', 'Private data source connect');
     case 'plugin-page-grafana-detect-app':
       return t('nav.detect.title', 'Detect');
     case 'plugin-page-grafana-quaderno-app':
@@ -208,11 +201,6 @@ export function getNavSubTitle(navId: string | undefined) {
       return t('nav.library-panels.subtitle', 'Reusable panels that can be added to multiple dashboards');
     case 'alerting':
       return t('nav.alerting.subtitle', 'Learn about problems in your systems moments after they occur');
-    case 'alerting-upgrade':
-      return t(
-        'nav.alerting-upgrade.subtitle',
-        'Upgrade your existing legacy alerts and notification channels to the new Grafana Alerting'
-      );
     case 'alert-list':
       return t('nav.alerting-list.subtitle', 'Rules that determine whether an alert will fire');
     case 'receivers':
@@ -250,11 +238,6 @@ export function getNavSubTitle(navId: string | undefined) {
       return t('nav.server-settings.subtitle', 'View the settings defined in your Grafana config');
     case 'storage':
       return t('nav.storage.subtitle', 'Manage file storage');
-    case 'migrate-to-cloud':
-      return t(
-        'nav.migrate-to-cloud.subtitle',
-        'Copy configuration from your self-managed installation to a cloud stack'
-      );
     case 'support-bundles':
       return t('nav.support-bundles.subtitle', 'Download support bundles');
     case 'admin':
@@ -284,11 +267,6 @@ export function getNavSubTitle(navId: string | undefined) {
       return t('nav.connections.subtitle', 'Browse and create new connections');
     case 'connections-datasources':
       return t('nav.data-sources.subtitle', 'View and manage your connected data source connections');
-    case 'connections-private-data-source-connections':
-      return t(
-        'nav.private-data-source-connections.subtitle',
-        'Query data that lives within a secured network without opening the network to inbound traffic from Grafana Cloud. Learn more in our docs.'
-      );
     default:
       return undefined;
   }

@@ -11,8 +11,9 @@ import {
   convertLegacyAuthProps,
   DataSourceDescription,
 } from '@grafana/experimental';
-import { config } from '@grafana/runtime';
-import { Alert, SecureSocksProxySettings, Divider, Stack } from '@grafana/ui';
+import { Alert, SecureSocksProxySettings } from '@grafana/ui';
+import { Divider } from 'app/core/components/Divider';
+import { config } from 'app/core/config';
 
 import { ElasticsearchOptions } from '../types';
 
@@ -60,9 +61,9 @@ export const ConfigEditor = (props: Props) => {
         docsLink="https://grafana.com/docs/grafana/latest/datasources/elasticsearch"
         hasRequiredFields={false}
       />
-      <Divider spacing={4} />
+      <Divider />
       <ConnectionSettings config={options} onChange={onOptionsChange} urlPlaceholder="http://localhost:9200" />
-      <Divider spacing={4} />
+      <Divider />
       <Auth
         {...authProps}
         onAuthMethodSelect={(method) => {
@@ -78,41 +79,42 @@ export const ConfigEditor = (props: Props) => {
           });
         }}
       />
-      <Divider spacing={4} />
+      <Divider />
       <ConfigSection
         title="Additional settings"
         description="Additional settings are optional settings that can be configured for more control over your data source."
         isCollapsible={true}
         isInitiallyOpen
       >
-        <Stack gap={5} direction="column">
-          <AdvancedHttpSettings config={options} onChange={onOptionsChange} />
-          {config.secureSocksDSProxyEnabled && (
-            <SecureSocksProxySettings options={options} onOptionsChange={onOptionsChange} />
-          )}
-          <ElasticDetails value={options} onChange={onOptionsChange} />
-          <LogsConfig
-            value={options.jsonData}
-            onChange={(newValue) =>
-              onOptionsChange({
-                ...options,
-                jsonData: newValue,
-              })
-            }
-          />
-          <DataLinks
-            value={options.jsonData.dataLinks}
-            onChange={(newValue) => {
-              onOptionsChange({
-                ...options,
-                jsonData: {
-                  ...options.jsonData,
-                  dataLinks: newValue,
-                },
-              });
-            }}
-          />
-        </Stack>
+        <AdvancedHttpSettings config={options} onChange={onOptionsChange} />
+        <Divider hideLine />
+        {config.secureSocksDSProxyEnabled && (
+          <SecureSocksProxySettings options={options} onOptionsChange={onOptionsChange} />
+        )}
+        <ElasticDetails value={options} onChange={onOptionsChange} />
+        <Divider hideLine />
+        <LogsConfig
+          value={options.jsonData}
+          onChange={(newValue) =>
+            onOptionsChange({
+              ...options,
+              jsonData: newValue,
+            })
+          }
+        />
+        <Divider hideLine />
+        <DataLinks
+          value={options.jsonData.dataLinks}
+          onChange={(newValue) => {
+            onOptionsChange({
+              ...options,
+              jsonData: {
+                ...options.jsonData,
+                dataLinks: newValue,
+              },
+            });
+          }}
+        />
       </ConfigSection>
     </>
   );

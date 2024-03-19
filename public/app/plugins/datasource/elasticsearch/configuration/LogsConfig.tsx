@@ -1,7 +1,8 @@
 import React from 'react';
 
-import { ConfigDescriptionLink, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSubSection } from '@grafana/experimental';
 import { Input, InlineField } from '@grafana/ui';
+import { ConfigDescriptionLink } from 'app/core/components/ConfigDescriptionLink';
 
 import { ElasticsearchOptions } from '../types';
 

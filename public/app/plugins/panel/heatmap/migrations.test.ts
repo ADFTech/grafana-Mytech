@@ -74,7 +74,7 @@ describe('Heatmap Migrations', () => {
           },
           "showValue": "never",
           "tooltip": {
-            "mode": "single",
+            "show": true,
             "yHistogram": true,
           },
           "yAxis": {
@@ -131,7 +131,7 @@ describe('Heatmap Migrations', () => {
           },
           "showValue": "never",
           "tooltip": {
-            "mode": "none",
+            "show": false,
             "yHistogram": false,
           },
           "yAxis": {

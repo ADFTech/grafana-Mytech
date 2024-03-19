@@ -445,18 +445,12 @@ describe('Plugin Extensions / Utils', () => {
   });
 
   describe('wrapExtensionComponentWithContext()', () => {
-    type ExampleComponentProps = {
-      audience?: string;
-    };
-
-    const ExampleComponent = (props: ExampleComponentProps) => {
+    const ExampleComponent = () => {
       const { meta } = usePluginContext();
-
-      const audience = props.audience || 'Grafana';
 
       return (
         <div>
-          <h1>Hello {audience}!</h1> Version: {meta.info.version}
+          <h1>Hello Grafana!</h1> Version: {meta.info.version}
         </div>
       );
     };
@@ -468,16 +462,6 @@ describe('Plugin Extensions / Utils', () => {
       render(<Component />);
 
       expect(await screen.findByText('Hello Grafana!')).toBeVisible();
-      expect(screen.getByText('Version: 1.0.0')).toBeVisible();
-    });
-
-    it('should pass the properties into the wrapped component', async () => {
-      const pluginId = 'grafana-worldmap-panel';
-      const Component = wrapWithPluginContext(pluginId, ExampleComponent);
-
-      render(<Component audience="folks" />);
-
-      expect(await screen.findByText('Hello folks!')).toBeVisible();
       expect(screen.getByText('Version: 1.0.0')).toBeVisible();
     });
   });

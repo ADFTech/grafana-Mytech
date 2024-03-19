@@ -6,7 +6,7 @@ import {
   RulerRuleGroupDTO,
 } from 'app/types/unified-alerting-dto';
 
-import { deleteRulerRulesGroup, fetchRulerRules, fetchRulerRulesGroup, setRulerRuleGroup } from '../api/ruler';
+import { deleteRulerRulesGroup, fetchRulerRulesGroup, fetchRulerRules, setRulerRuleGroup } from '../api/ruler';
 import { RuleFormValues } from '../types/rule-form';
 import * as ruleId from '../utils/rule-id';
 
@@ -41,7 +41,6 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
               group,
               ruleSourceName: GRAFANA_RULES_SOURCE_NAME,
               namespace: namespace,
-              namespace_uid: (isGrafanaRulerRule(rule) && rule.grafana_alert.namespace_uid) || undefined,
               rule,
             };
           }
@@ -82,15 +81,15 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
   };
 
   const deleteRule = async (ruleWithLocation: RuleWithLocation): Promise<void> => {
-    const { namespace, group, rule, namespace_uid } = ruleWithLocation;
+    const { namespace, group, rule } = ruleWithLocation;
 
     // it was the last rule, delete the entire group
     if (group.rules.length === 1) {
-      await deleteRulerRulesGroup(rulerConfig, namespace_uid || namespace, group.name);
+      await deleteRulerRulesGroup(rulerConfig, namespace, group.name);
       return;
     }
     // post the group with rule removed
-    await setRulerRuleGroup(rulerConfig, namespace_uid || namespace, {
+    await setRulerRuleGroup(rulerConfig, namespace, {
       ...group,
       rules: group.rules.filter((r) => r !== rule),
     });
@@ -160,11 +159,11 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
     }
 
     const newRule = formValuesToRulerGrafanaRuleDTO(values);
-    const namespaceUID = folder.uid;
+    const namespace = folder.title;
     const groupSpec = { name: group, interval: evaluateEvery };
 
     if (!existingRule) {
-      return addRuleToNamespaceAndGroup(namespaceUID, groupSpec, newRule);
+      return addRuleToNamespaceAndGroup(namespace, groupSpec, newRule);
     }
 
     // we'll fetch the existing group again, someone might have updated it while we were editing a rule
@@ -173,7 +172,7 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
       throw new Error('Rule not found.');
     }
 
-    const sameNamespace = freshExisting.namespace_uid === namespaceUID;
+    const sameNamespace = freshExisting.namespace === namespace;
     const sameGroup = freshExisting.group.name === values.group;
     const sameLocation = sameNamespace && sameGroup;
 
@@ -182,16 +181,16 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
       return updateGrafanaRule(freshExisting, newRule, evaluateEvery);
     } else {
       // we're moving a rule to either a different group or namespace
-      return moveGrafanaRule(namespaceUID, groupSpec, freshExisting, newRule);
+      return moveGrafanaRule(namespace, groupSpec, freshExisting, newRule);
     }
   };
 
   const addRuleToNamespaceAndGroup = async (
-    namespaceUID: string,
+    namespace: string,
     group: { name: string; interval: string },
     newRule: PostableRuleGrafanaRuleDTO
   ): Promise<RuleIdentifier> => {
-    const existingGroup = await fetchRulerRulesGroup(rulerConfig, namespaceUID, group.name);
+    const existingGroup = await fetchRulerRulesGroup(rulerConfig, namespace, group.name);
     if (!existingGroup) {
       throw new Error(`No group found with name "${group.name}"`);
     }
@@ -202,7 +201,7 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
       rules: (existingGroup.rules ?? []).concat(newRule as RulerGrafanaRuleDTO),
     };
 
-    await setRulerRuleGroup(rulerConfig, namespaceUID, payload);
+    await setRulerRuleGroup(rulerConfig, namespace, payload);
 
     return { uid: newRule.grafana_alert.uid ?? '', ruleSourceName: GRAFANA_RULES_SOURCE_NAME };
   };
@@ -243,7 +242,7 @@ export function getRulerClient(rulerConfig: RulerDataSourceConfig): RulerClient 
       return rule;
     });
 
-    await setRulerRuleGroup(rulerConfig, existingRule.namespace_uid ?? '', {
+    await setRulerRuleGroup(rulerConfig, existingRule.namespace, {
       name: existingRule.group.name,
       interval: interval,
       rules: newRules,

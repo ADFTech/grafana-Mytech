@@ -12,7 +12,6 @@ import { getVariableUsageInfo } from '../../explore/utils/links';
 
 import { TransformationsEditor } from './TransformationsEditor';
 import { useCorrelationsFormContext } from './correlationsFormContext';
-import { FormDTO } from './types';
 import { getInputId } from './utils';
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -26,7 +25,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
 });
 
 export const ConfigureCorrelationSourceForm = () => {
-  const { control, formState, register, getValues } = useFormContext<FormDTO>();
+  const { control, formState, register, getValues } = useFormContext();
   const styles = useStyles2(getStyles);
   const withDsUID = (fn: Function) => (ds: DataSourceInstanceSettings) => fn(ds.uid);
 

@@ -1,8 +1,9 @@
 import React from 'react';
 
 import { DataSourceSettings, SelectableValue } from '@grafana/data';
-import { ConfigDescriptionLink, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSubSection } from '@grafana/experimental';
 import { InlineField, Input, Select, InlineSwitch } from '@grafana/ui';
+import { ConfigDescriptionLink } from 'app/core/components/ConfigDescriptionLink';
 
 import { ElasticsearchOptions, Interval } from '../types';
 

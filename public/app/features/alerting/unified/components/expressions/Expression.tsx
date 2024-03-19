@@ -1,15 +1,13 @@
 import { css, cx } from '@emotion/css';
 import { uniqueId } from 'lodash';
 import React, { FC, useCallback, useState } from 'react';
-import { useFormContext } from 'react-hook-form';
 
 import { DataFrame, dateTimeFormat, GrafanaTheme2, isTimeSeriesFrames, LoadingState, PanelData } from '@grafana/data';
-import { Alert, AutoSizeInput, Button, clearButtonStyles, IconButton, Stack, useStyles2 } from '@grafana/ui';
+import { AutoSizeInput, Button, clearButtonStyles, IconButton, useStyles2, Stack } from '@grafana/ui';
 import { ClassicConditions } from 'app/features/expressions/components/ClassicConditions';
 import { Math } from 'app/features/expressions/components/Math';
 import { Reduce } from 'app/features/expressions/components/Reduce';
 import { Resample } from 'app/features/expressions/components/Resample';
-import { SqlExpr } from 'app/features/expressions/components/SqlExpr';
 import { Threshold } from 'app/features/expressions/components/Threshold';
 import {
   ExpressionQuery,
@@ -58,19 +56,6 @@ export const Expression: FC<ExpressionProps> = ({
 
   const queryType = query?.type;
 
-  const { setError, clearErrors } = useFormContext();
-
-  const onQueriesValidationError = useCallback(
-    (errorMsg: string | undefined) => {
-      if (errorMsg) {
-        setError('queries', { type: 'custom', message: errorMsg });
-      } else {
-        clearErrors('queries');
-      }
-    },
-    [setError, clearErrors]
-  );
-
   const isLoading = data && Object.values(data).some((d) => Boolean(d) && d.state === LoadingState.Loading);
   const hasResults = Array.isArray(data?.series) && !isLoading;
   const series = data?.series ?? [];
@@ -100,25 +85,13 @@ export const Expression: FC<ExpressionProps> = ({
           return <ClassicConditions onChange={onChangeQuery} query={query} refIds={availableRefIds} />;
 
         case ExpressionQueryType.threshold:
-          return (
-            <Threshold
-              onChange={onChangeQuery}
-              query={query}
-              labelWidth={'auto'}
-              refIds={availableRefIds}
-              onError={onQueriesValidationError}
-              useHysteresis={true}
-            />
-          );
-
-        case ExpressionQueryType.sql:
-          return <SqlExpr onChange={onChangeQuery} query={query} refIds={availableRefIds} />;
+          return <Threshold onChange={onChangeQuery} query={query} labelWidth={'auto'} refIds={availableRefIds} />;
 
         default:
           return <>Expression not supported: {query.type}</>;
       }
     },
-    [onChangeQuery, queries, onQueriesValidationError]
+    [onChangeQuery, queries]
   );
   const selectedExpressionType = expressionTypes.find((o) => o.value === queryType);
   const selectedExpressionDescription = selectedExpressionType?.description ?? '';
@@ -140,20 +113,12 @@ export const Expression: FC<ExpressionProps> = ({
           onUpdateRefId={(newRefId) => onUpdateRefId(query.refId, newRefId)}
           onUpdateExpressionType={(type) => onUpdateExpressionType(query.refId, type)}
           onSetCondition={onSetCondition}
+          warning={warning}
+          error={error}
           query={query}
           alertCondition={alertCondition}
         />
         <div className={styles.expression.body}>
-          {error && (
-            <Alert title="Expression failed" severity="error">
-              {error.message}
-            </Alert>
-          )}
-          {warning && (
-            <Alert title="Expression warning" severity="warning">
-              {warning.message}
-            </Alert>
-          )}
           <div className={styles.expression.description}>{selectedExpressionDescription}</div>
           {renderExpressionType(query)}
         </div>
@@ -287,6 +252,8 @@ interface HeaderProps {
   onUpdateRefId: (refId: string) => void;
   onRemoveExpression: () => void;
   onUpdateExpressionType: (type: ExpressionQueryType) => void;
+  warning?: Error;
+  error?: Error;
   onSetCondition: (refId: string) => void;
   query: ExpressionQuery;
   alertCondition: boolean;
@@ -297,9 +264,11 @@ const Header: FC<HeaderProps> = ({
   queryType,
   onUpdateRefId,
   onRemoveExpression,
+  warning,
   onSetCondition,
   alertCondition,
   query,
+  error,
 }) => {
   const styles = useStyles2(getStyles);
   const clearButton = useStyles2(clearButtonStyles);
@@ -343,7 +312,12 @@ const Header: FC<HeaderProps> = ({
           <div>{getExpressionLabel(queryType)}</div>
         </Stack>
         <Spacer />
-        <ExpressionStatusIndicator onSetCondition={() => onSetCondition(query.refId)} isCondition={alertCondition} />
+        <ExpressionStatusIndicator
+          error={error}
+          warning={warning}
+          onSetCondition={() => onSetCondition(query.refId)}
+          isCondition={alertCondition}
+        />
         <IconButton
           name="trash-alt"
           variant="secondary"

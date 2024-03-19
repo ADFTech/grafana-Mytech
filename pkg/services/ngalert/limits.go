@@ -65,6 +65,14 @@ func readQuotaConfig(cfg *setting.Cfg) (*quota.Map, error) {
 		return limits, nil
 	}
 
+	var alertOrgQuota int64
+	var alertGlobalQuota int64
+
+	if cfg.UnifiedAlerting.IsEnabled() {
+		alertOrgQuota = cfg.Quota.Org.AlertRule
+		alertGlobalQuota = cfg.Quota.Global.AlertRule
+	}
+
 	globalQuotaTag, err := quota.NewTag(models.QuotaTargetSrv, models.QuotaTarget, quota.GlobalScope)
 	if err != nil {
 		return limits, err
@@ -74,7 +82,7 @@ func readQuotaConfig(cfg *setting.Cfg) (*quota.Map, error) {
 		return limits, err
 	}
 
-	limits.Set(globalQuotaTag, cfg.Quota.Global.AlertRule)
-	limits.Set(orgQuotaTag, cfg.Quota.Org.AlertRule)
+	limits.Set(globalQuotaTag, alertGlobalQuota)
+	limits.Set(orgQuotaTag, alertOrgQuota)
 	return limits, nil
 }

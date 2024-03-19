@@ -5,7 +5,6 @@ import { TestProvider } from 'test/helpers/TestProvider';
 import { byLabelText, byPlaceholderText, byRole, byTestId, byText } from 'testing-library-selector';
 
 import { dateTime } from '@grafana/data';
-import { selectors } from '@grafana/e2e-selectors';
 import { config, locationService, setDataSourceSrv } from '@grafana/runtime';
 import { contextSrv } from 'app/core/services/context_srv';
 import { AlertState, MatcherOperator } from 'app/plugins/datasource/alertmanager/types';
@@ -16,8 +15,6 @@ import { SilenceState } from '../../../plugins/datasource/alertmanager/types';
 import Silences from './Silences';
 import { createOrUpdateSilence, fetchAlerts, fetchSilences } from './api/alertmanager';
 import { grantUserPermissions, mockAlertmanagerAlert, mockDataSource, MockDataSourceSrv, mockSilence } from './mocks';
-import { AlertmanagerProvider } from './state/AlertmanagerContext';
-import { setupDataSources } from './testSetup/datasources';
 import { parseMatchers } from './utils/alertmanager';
 import { DataSourceType } from './utils/datasource';
 
@@ -40,9 +37,7 @@ const renderSilences = (location = '/alerting/silences/') => {
 
   return render(
     <TestProvider>
-      <AlertmanagerProvider accessType="instance">
-        <Silences />
-      </AlertmanagerProvider>
+      <Silences />
     </TestProvider>
   );
 };
@@ -63,7 +58,7 @@ const ui = {
   addSilenceButton: byRole('link', { name: /add silence/i }),
   queryBar: byPlaceholderText('Search'),
   editor: {
-    timeRange: byTestId(selectors.components.TimePicker.openButton),
+    timeRange: byLabelText('Timepicker', { exact: false }),
     durationField: byLabelText('Duration'),
     durationInput: byRole('textbox', { name: /duration/i }),
     matchersField: byTestId('matcher'),
@@ -223,7 +218,7 @@ describe('Silence edit', () => {
 
   beforeEach(() => {
     setUserLogged(true);
-    setupDataSources(dataSources.am);
+    setDataSourceSrv(new MockDataSourceSrv(dataSources));
   });
 
   it('Should not render createdBy if user is logged in and has a name', async () => {
@@ -327,34 +322,6 @@ describe('Silence edit', () => {
           })
         )
       );
-    },
-    TEST_TIMEOUT
-  );
-
-  it(
-    'silences page should contain alertmanager parameter after creating a silence',
-    async () => {
-      const user = userEvent.setup();
-
-      renderSilences(`${baseUrlPath}?alertmanager=Alertmanager`);
-      await waitFor(() => expect(ui.editor.durationField.query()).not.toBeNull());
-
-      await user.type(ui.editor.matcherName.getAll()[0], 'foo');
-      await user.type(ui.editor.matcherOperatorSelect.getAll()[0], '=');
-      await user.type(ui.editor.matcherValue.getAll()[0], 'bar');
-
-      await user.click(ui.editor.submit.get());
-
-      await waitFor(() =>
-        expect(mocks.api.createOrUpdateSilence).toHaveBeenCalledWith(
-          'Alertmanager',
-          expect.objectContaining({
-            matchers: [{ isEqual: true, isRegex: false, name: 'foo', value: 'bar' }],
-          })
-        )
-      );
-
-      expect(locationService.getSearch().get('alertmanager')).toBe('Alertmanager');
     },
     TEST_TIMEOUT
   );

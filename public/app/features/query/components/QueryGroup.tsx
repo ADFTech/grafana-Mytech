@@ -23,7 +23,7 @@ import { DataSourceModal } from 'app/features/datasources/components/picker/Data
 import { DataSourcePicker } from 'app/features/datasources/components/picker/DataSourcePicker';
 import { dataSource as expressionDatasource } from 'app/features/expressions/ExpressionDatasource';
 import { AngularDeprecationPluginNotice } from 'app/features/plugins/angularDeprecation/AngularDeprecationPluginNotice';
-import { isSharedDashboardQuery } from 'app/plugins/datasource/dashboard';
+import { DashboardQueryEditor, isSharedDashboardQuery } from 'app/plugins/datasource/dashboard';
 import { GrafanaQuery } from 'app/plugins/datasource/grafana/types';
 import { QueryGroupOptions } from 'app/types';
 
@@ -122,7 +122,7 @@ export class QueryGroup extends PureComponent<Props, State> {
         defaultDataSource,
       });
     } catch (error) {
-      console.error('failed to load data source', error);
+      console.log('failed to load data source', error);
     }
   }
 
@@ -252,6 +252,16 @@ export class QueryGroup extends PureComponent<Props, State> {
   renderQueries(dsSettings: DataSourceInstanceSettings) {
     const { onRunQueries } = this.props;
     const { data, queries } = this.state;
+    if (isSharedDashboardQuery(dsSettings.name)) {
+      return (
+        <DashboardQueryEditor
+          queries={queries}
+          panelData={data}
+          onChange={this.onQueriesChange}
+          onRunQueries={onRunQueries}
+        />
+      );
+    }
 
     return (
       <div aria-label={selectors.components.QueryTab.content}>
@@ -497,7 +507,7 @@ function DataSourcePickerWithPrompt({ options, onChange, ...otherProps }: DataSo
 
   return (
     <>
-      {isDataSourceModalOpen && (
+      {isDataSourceModalOpen && config.featureToggles.advancedDataSourcePicker && (
         <DataSourceModal {...commonProps} onDismiss={() => setIsDataSourceModalOpen(false)}></DataSourceModal>
       )}
 

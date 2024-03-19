@@ -1,20 +1,14 @@
 import { css } from '@emotion/css';
-import {
-  autoUpdate,
-  flip,
-  offset,
-  shift,
-  useClick,
-  useDismiss,
-  useFloating,
-  useInteractions,
-} from '@floating-ui/react';
+import { useButton } from '@react-aria/button';
 import { FocusScope } from '@react-aria/focus';
-import React, { HTMLAttributes, useState } from 'react';
+import { useMenuTrigger } from '@react-aria/menu';
+import { useMenuTriggerState } from '@react-stately/menu';
+import React, { HTMLAttributes } from 'react';
 
 import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 
 import { useStyles2 } from '../../themes/ThemeContext';
+import { ClickOutsideWrapper } from '../ClickOutsideWrapper/ClickOutsideWrapper';
 import { Menu } from '../Menu/Menu';
 import { MenuItem } from '../Menu/MenuItem';
 import { ToolbarButton, ToolbarButtonVariant } from '../ToolbarButton';
@@ -39,72 +33,53 @@ export interface Props<T> extends HTMLAttributes<HTMLButtonElement> {
 const ButtonSelectComponent = <T,>(props: Props<T>) => {
   const { className, options, value, onChange, narrow, variant, ...restProps } = props;
   const styles = useStyles2(getStyles);
-  const [isOpen, setIsOpen] = useState(false);
+  const state = useMenuTriggerState({});
 
-  // the order of middleware is important!
-  const middleware = [
-    offset(0),
-    flip({
-      fallbackAxisSideDirection: 'end',
-      // see https://floating-ui.com/docs/flip#combining-with-shift
-      crossAxis: false,
-      boundary: document.body,
-    }),
-    shift(),
-  ];
-
-  const { context, refs, floatingStyles } = useFloating({
-    open: isOpen,
-    placement: 'bottom-end',
-    onOpenChange: setIsOpen,
-    middleware,
-    whileElementsMounted: autoUpdate,
-  });
-
-  const click = useClick(context);
-  const dismiss = useDismiss(context);
-
-  const { getReferenceProps, getFloatingProps } = useInteractions([dismiss, click]);
+  const ref = React.useRef(null);
+  const { menuTriggerProps, menuProps } = useMenuTrigger({}, state, ref);
+  const { buttonProps } = useButton(menuTriggerProps, ref);
 
   const onChangeInternal = (item: SelectableValue<T>) => {
     onChange(item);
-    setIsOpen(false);
+    state.close();
   };
 
   return (
     <div className={styles.wrapper}>
       <ToolbarButton
         className={className}
-        isOpen={isOpen}
+        isOpen={state.isOpen}
         narrow={narrow}
         variant={variant}
-        ref={refs.setReference}
-        {...getReferenceProps()}
+        ref={ref}
+        {...buttonProps}
         {...restProps}
       >
         {value?.label || (value?.value != null ? String(value?.value) : null)}
       </ToolbarButton>
-      {isOpen && (
-        <div className={styles.menuWrapper} ref={refs.setFloating} {...getFloatingProps()} style={floatingStyles}>
-          <FocusScope contain autoFocus restoreFocus>
-            {/*
-              tabIndex=-1 is needed here to support highlighting text within the menu when using FocusScope
-              see https://github.com/adobe/react-spectrum/issues/1604#issuecomment-781574668
-            */}
-            <Menu tabIndex={-1} onClose={() => setIsOpen(false)}>
-              {options.map((item) => (
-                <MenuItem
-                  key={`${item.value}`}
-                  label={item.label ?? String(item.value)}
-                  onClick={() => onChangeInternal(item)}
-                  active={item.value === value?.value}
-                  ariaChecked={item.value === value?.value}
-                  ariaLabel={item.ariaLabel || item.label}
-                  role="menuitemradio"
-                />
-              ))}
-            </Menu>
-          </FocusScope>
+      {state.isOpen && (
+        <div className={styles.menuWrapper}>
+          <ClickOutsideWrapper onClick={state.close} parent={document} includeButtonPress={false}>
+            <FocusScope contain autoFocus restoreFocus>
+              {/*
+                tabIndex=-1 is needed here to support highlighting text within the menu when using FocusScope
+                see https://github.com/adobe/react-spectrum/issues/1604#issuecomment-781574668
+              */}
+              <Menu tabIndex={-1} onClose={state.close} {...menuProps} autoFocus={!!menuProps.autoFocus}>
+                {options.map((item) => (
+                  <MenuItem
+                    key={`${item.value}`}
+                    label={item.label ?? String(item.value)}
+                    onClick={() => onChangeInternal(item)}
+                    active={item.value === value?.value}
+                    ariaChecked={item.value === value?.value}
+                    ariaLabel={item.ariaLabel || item.label}
+                    role="menuitemradio"
+                  />
+                ))}
+              </Menu>
+            </FocusScope>
+          </ClickOutsideWrapper>
         </div>
       )}
     </div>
@@ -125,7 +100,10 @@ const getStyles = (theme: GrafanaTheme2) => {
       display: 'inline-flex',
     }),
     menuWrapper: css({
+      position: 'absolute',
       zIndex: theme.zIndex.dropdown,
+      top: theme.spacing(4),
+      right: 0,
     }),
   };
 };

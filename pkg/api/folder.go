@@ -9,7 +9,6 @@ import (
 	"github.com/grafana/grafana/pkg/api/apierrors"
 	"github.com/grafana/grafana/pkg/api/dtos"
 	"github.com/grafana/grafana/pkg/api/response"
-	"github.com/grafana/grafana/pkg/infra/metrics"
 	"github.com/grafana/grafana/pkg/services/accesscontrol"
 	"github.com/grafana/grafana/pkg/services/auth/identity"
 	contextmodel "github.com/grafana/grafana/pkg/services/contexthandler/model"
@@ -31,7 +30,7 @@ const REDACTED = "redacted"
 //
 // Get all folders.
 //
-// It returns all folders that the authenticated user has permission to view.
+// Returns all folders that the authenticated user has permission to view.
 // If nested folders are enabled, it expects an additional query parameter with the parent folder UID
 // and returns the immediate subfolders that the authenticated user has permission to view.
 // If the parameter is not supplied then it returns immediate subfolders under the root
@@ -43,46 +42,35 @@ const REDACTED = "redacted"
 // 403: forbiddenError
 // 500: internalServerError
 func (hs *HTTPServer) GetFolders(c *contextmodel.ReqContext) response.Response {
-	permission := dashboardaccess.PERMISSION_VIEW
-	if c.Query("permission") == "Edit" {
-		permission = dashboardaccess.PERMISSION_EDIT
-	}
-
+	var folders []*folder.Folder
+	var err error
 	if hs.Features.IsEnabled(c.Req.Context(), featuremgmt.FlagNestedFolders) {
-		q := &folder.GetChildrenQuery{
+		folders, err = hs.folderService.GetChildren(c.Req.Context(), &folder.GetChildrenQuery{
 			OrgID:        c.SignedInUser.GetOrgID(),
 			Limit:        c.QueryInt64("limit"),
 			Page:         c.QueryInt64("page"),
 			UID:          c.Query("parentUid"),
-			Permission:   permission,
 			SignedInUser: c.SignedInUser,
-		}
-
-		folders, err := hs.folderService.GetChildren(c.Req.Context(), q)
-		if err != nil {
-			return apierrors.ToFolderErrorResponse(err)
-		}
-
-		hits := make([]dtos.FolderSearchHit, 0)
-		for _, f := range folders {
-			hits = append(hits, dtos.FolderSearchHit{
-				ID:        f.ID, // nolint:staticcheck
-				UID:       f.UID,
-				Title:     f.Title,
-				ParentUID: f.ParentUID,
-			})
-			metrics.MFolderIDsAPICount.WithLabelValues(metrics.GetFolders).Inc()
-		}
-
-		return response.JSON(http.StatusOK, hits)
+		})
+	} else {
+		folders, err = hs.searchFolders(c)
 	}
 
-	hits, err := hs.searchFolders(c, permission)
 	if err != nil {
 		return apierrors.ToFolderErrorResponse(err)
 	}
 
-	return response.JSON(http.StatusOK, hits)
+	result := make([]dtos.FolderSearchHit, 0)
+	for _, f := range folders {
+		result = append(result, dtos.FolderSearchHit{
+			ID:        f.ID, // nolint:staticcheck
+			UID:       f.UID,
+			Title:     f.Title,
+			ParentUID: f.ParentUID,
+		})
+	}
+
+	return response.JSON(http.StatusOK, result)
 }
 
 // swagger:route GET /folders/{folder_uid} folders getFolderByUID
@@ -130,7 +118,6 @@ func (hs *HTTPServer) GetFolderByID(c *contextmodel.ReqContext) response.Respons
 	if err != nil {
 		return response.Error(http.StatusBadRequest, "id is invalid", err)
 	}
-	metrics.MFolderIDsAPICount.WithLabelValues(metrics.GetFolderByID).Inc()
 	// nolint:staticcheck
 	folder, err := hs.folderService.Get(c.Req.Context(), &folder.GetFolderQuery{ID: &id, OrgID: c.SignedInUser.GetOrgID(), SignedInUser: c.SignedInUser})
 	if err != nil {
@@ -304,7 +291,7 @@ func (hs *HTTPServer) DeleteFolder(c *contextmodel.ReqContext) response.Response
 	err := hs.LibraryElementService.DeleteLibraryElementsInFolder(c.Req.Context(), c.SignedInUser, web.Params(c.Req)[":uid"])
 	if err != nil {
 		if errors.Is(err, model.ErrFolderHasConnectedLibraryElements) {
-			return response.Error(http.StatusForbidden, "Folder could not be deleted because it contains library elements in use", err)
+			return response.Error(403, "Folder could not be deleted because it contains library elements in use", err)
 		}
 		return apierrors.ToFolderErrorResponse(err)
 	}
@@ -378,7 +365,7 @@ func (hs *HTTPServer) newToFolderDto(c *contextmodel.ReqContext, f *folder.Folde
 				}, nil
 			}
 		}
-		metrics.MFolderIDsAPICount.WithLabelValues(metrics.NewToFolderDTO).Inc()
+
 		return dtos.Folder{
 			ID:            f.ID, // nolint:staticcheck
 			UID:           f.UID,
@@ -454,7 +441,7 @@ func (hs *HTTPServer) getFolderACMetadata(c *contextmodel.ReqContext, f *folder.
 	return metadata, nil
 }
 
-func (hs *HTTPServer) searchFolders(c *contextmodel.ReqContext, permission dashboardaccess.PermissionType) ([]dtos.FolderSearchHit, error) {
+func (hs *HTTPServer) searchFolders(c *contextmodel.ReqContext) ([]*folder.Folder, error) {
 	searchQuery := search.Query{
 		SignedInUser: c.SignedInUser,
 		DashboardIds: make([]int64, 0),
@@ -462,7 +449,7 @@ func (hs *HTTPServer) searchFolders(c *contextmodel.ReqContext, permission dashb
 		Limit:        c.QueryInt64("limit"),
 		OrgId:        c.SignedInUser.GetOrgID(),
 		Type:         "dash-folder",
-		Permission:   permission,
+		Permission:   dashboardaccess.PERMISSION_VIEW,
 		Page:         c.QueryInt64("page"),
 	}
 
@@ -471,17 +458,17 @@ func (hs *HTTPServer) searchFolders(c *contextmodel.ReqContext, permission dashb
 		return nil, err
 	}
 
-	folderHits := make([]dtos.FolderSearchHit, 0)
+	folders := make([]*folder.Folder, 0)
+
 	for _, hit := range hits {
-		folderHits = append(folderHits, dtos.FolderSearchHit{
+		folders = append(folders, &folder.Folder{
 			ID:    hit.ID, // nolint:staticcheck
 			UID:   hit.UID,
 			Title: hit.Title,
 		})
-		metrics.MFolderIDsAPICount.WithLabelValues(metrics.SearchFolders).Inc()
 	}
 
-	return folderHits, nil
+	return folders, nil
 }
 
 // swagger:parameters getFolders
@@ -500,12 +487,6 @@ type GetFoldersParams struct {
 	// in:query
 	// required:false
 	ParentUID string `json:"parentUid"`
-	// Set to `Edit` to return folders that the user can edit
-	// in:query
-	// required: false
-	// default:View
-	// Enum: Edit,View
-	Permission string `json:"permission"`
 }
 
 // swagger:parameters getFolderByUID

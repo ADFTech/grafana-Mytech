@@ -14,7 +14,6 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/dashboards"
-	"github.com/grafana/grafana/pkg/services/folder"
 	"github.com/grafana/grafana/pkg/util"
 )
 
@@ -42,7 +41,7 @@ func TestCreatingNewDashboardFileReader(t *testing.T) {
 	t.Run("using path parameter", func(t *testing.T) {
 		cfg := setup()
 		cfg.Options["path"] = defaultDashboards
-		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil, nil)
+		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil)
 		require.NoError(t, err)
 		require.NotEqual(t, reader.Path, "")
 	})
@@ -50,7 +49,7 @@ func TestCreatingNewDashboardFileReader(t *testing.T) {
 	t.Run("using folder as options", func(t *testing.T) {
 		cfg := setup()
 		cfg.Options["folder"] = defaultDashboards
-		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil, nil)
+		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil)
 		require.NoError(t, err)
 		require.NotEqual(t, reader.Path, "")
 	})
@@ -59,7 +58,7 @@ func TestCreatingNewDashboardFileReader(t *testing.T) {
 		cfg := setup()
 		cfg.Options["path"] = foldersFromFilesStructure
 		cfg.Options["foldersFromFilesStructure"] = true
-		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil, nil)
+		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil)
 		require.NoError(t, err)
 		require.NotEqual(t, reader.Path, "")
 	})
@@ -72,7 +71,7 @@ func TestCreatingNewDashboardFileReader(t *testing.T) {
 		}
 
 		cfg.Options["folder"] = fullPath
-		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil, nil)
+		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil)
 		require.NoError(t, err)
 
 		require.Equal(t, reader.Path, fullPath)
@@ -82,7 +81,7 @@ func TestCreatingNewDashboardFileReader(t *testing.T) {
 	t.Run("using relative path", func(t *testing.T) {
 		cfg := setup()
 		cfg.Options["folder"] = defaultDashboards
-		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil, nil)
+		reader, err := NewDashboardFileReader(cfg, log.New("test-logger"), nil, nil)
 		require.NoError(t, err)
 
 		resolvedPath := reader.resolvedPath()
@@ -114,10 +113,10 @@ func TestDashboardFileReader(t *testing.T) {
 			cfg.Folder = "Team A"
 
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(nil, nil).Once()
-			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&folder.Folder{}, nil).Once()
+			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&dashboards.Dashboard{ID: 1}, nil).Once()
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{ID: 2}, nil).Times(2)
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -137,7 +136,7 @@ func TestDashboardFileReader(t *testing.T) {
 					inserted++
 				})
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -174,7 +173,7 @@ func TestDashboardFileReader(t *testing.T) {
 
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(provisionedDashboard, nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -202,7 +201,7 @@ func TestDashboardFileReader(t *testing.T) {
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(provisionedDashboard, nil).Once()
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -237,7 +236,7 @@ func TestDashboardFileReader(t *testing.T) {
 
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(provisionedDashboard, nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -265,7 +264,7 @@ func TestDashboardFileReader(t *testing.T) {
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(provisionedDashboard, nil).Once()
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -280,7 +279,7 @@ func TestDashboardFileReader(t *testing.T) {
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(nil, nil).Once()
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -294,10 +293,10 @@ func TestDashboardFileReader(t *testing.T) {
 			cfg.Options["foldersFromFilesStructure"] = true
 
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, configName).Return(nil, nil).Once()
-			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&folder.Folder{}, nil).Times(2)
+			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Times(2)
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Times(3)
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -314,7 +313,7 @@ func TestDashboardFileReader(t *testing.T) {
 				Folder: "",
 			}
 
-			_, err := NewDashboardFileReader(cfg, logger, nil, nil, nil)
+			_, err := NewDashboardFileReader(cfg, logger, nil, nil)
 			require.NotNil(t, err)
 		})
 
@@ -322,7 +321,7 @@ func TestDashboardFileReader(t *testing.T) {
 			setup()
 			cfg.Options["path"] = brokenDashboards
 
-			_, err := NewDashboardFileReader(cfg, logger, nil, nil, nil)
+			_, err := NewDashboardFileReader(cfg, logger, nil, nil)
 			require.NoError(t, err)
 		})
 
@@ -332,17 +331,17 @@ func TestDashboardFileReader(t *testing.T) {
 			cfg2 := &config{Name: "2", Type: "file", OrgID: 1, Folder: "f2", Options: map[string]any{"path": containingID}}
 
 			fakeService.On("GetProvisionedDashboardData", mock.Anything, mock.AnythingOfType("string")).Return(nil, nil).Times(2)
-			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&folder.Folder{}, nil).Times(2)
+			fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Times(2)
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Times(2)
 
-			reader1, err := NewDashboardFileReader(cfg1, logger, nil, fakeStore, nil)
+			reader1, err := NewDashboardFileReader(cfg1, logger, nil, fakeStore)
 			reader1.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
 			err = reader1.walkDisk(context.Background())
 			require.NoError(t, err)
 
-			reader2, err := NewDashboardFileReader(cfg2, logger, nil, fakeStore, nil)
+			reader2, err := NewDashboardFileReader(cfg2, logger, nil, fakeStore)
 			reader2.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 
@@ -362,7 +361,7 @@ func TestDashboardFileReader(t *testing.T) {
 				"folder": defaultDashboards,
 			},
 		}
-		r, err := NewDashboardFileReader(cfg, logger, nil, nil, nil)
+		r, err := NewDashboardFileReader(cfg, logger, nil, nil)
 		require.NoError(t, err)
 
 		_, _, err = r.getOrCreateFolder(context.Background(), cfg, fakeService, cfg.Folder)
@@ -380,9 +379,9 @@ func TestDashboardFileReader(t *testing.T) {
 				"folder": defaultDashboards,
 			},
 		}
-		fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&folder.Folder{}, nil).Once()
+		fakeService.On("SaveFolderForProvisionedDashboards", mock.Anything, mock.Anything).Return(&dashboards.Dashboard{ID: 1}, nil).Once()
 
-		r, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+		r, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 		require.NoError(t, err)
 
 		_, _, err = r.getOrCreateFolder(context.Background(), cfg, fakeService, cfg.Folder)
@@ -402,7 +401,7 @@ func TestDashboardFileReader(t *testing.T) {
 			},
 		}
 
-		r, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+		r, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 		require.NoError(t, err)
 
 		_, _, err = r.getOrCreateFolder(context.Background(), cfg, fakeService, cfg.Folder)
@@ -457,7 +456,7 @@ func TestDashboardFileReader(t *testing.T) {
 
 			cfg.DisableDeletion = true
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			require.NoError(t, err)
 			reader.dashboardProvisioningService = fakeService
 
@@ -472,7 +471,7 @@ func TestDashboardFileReader(t *testing.T) {
 			fakeService.On("SaveProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(&dashboards.Dashboard{}, nil).Once()
 			fakeService.On("DeleteProvisionedDashboard", mock.Anything, mock.Anything, mock.Anything).Return(nil).Once()
 
-			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore, nil)
+			reader, err := NewDashboardFileReader(cfg, logger, nil, fakeStore)
 			reader.dashboardProvisioningService = fakeService
 			require.NoError(t, err)
 

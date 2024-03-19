@@ -7,7 +7,6 @@ import (
 
 	"github.com/grafana/grafana/pkg/infra/log"
 	"github.com/grafana/grafana/pkg/services/dashboards"
-	"github.com/grafana/grafana/pkg/services/folder"
 	"github.com/grafana/grafana/pkg/services/org"
 	"github.com/grafana/grafana/pkg/services/provisioning/utils"
 )
@@ -24,7 +23,7 @@ type DashboardProvisioner interface {
 }
 
 // DashboardProvisionerFactory creates DashboardProvisioners based on input
-type DashboardProvisionerFactory func(context.Context, string, dashboards.DashboardProvisioningService, org.Service, utils.DashboardStore, folder.Service) (DashboardProvisioner, error)
+type DashboardProvisionerFactory func(context.Context, string, dashboards.DashboardProvisioningService, org.Service, utils.DashboardStore) (DashboardProvisioner, error)
 
 // Provisioner is responsible for syncing dashboard from disk to Grafana's database.
 type Provisioner struct {
@@ -40,7 +39,7 @@ func (provider *Provisioner) HasDashboardSources() bool {
 }
 
 // New returns a new DashboardProvisioner
-func New(ctx context.Context, configDirectory string, provisioner dashboards.DashboardProvisioningService, orgService org.Service, dashboardStore utils.DashboardStore, folderService folder.Service) (DashboardProvisioner, error) {
+func New(ctx context.Context, configDirectory string, provisioner dashboards.DashboardProvisioningService, orgService org.Service, dashboardStore utils.DashboardStore) (DashboardProvisioner, error) {
 	logger := log.New("provisioning.dashboard")
 	cfgReader := &configReader{path: configDirectory, log: logger, orgService: orgService}
 	configs, err := cfgReader.readConfig(ctx)
@@ -48,7 +47,7 @@ func New(ctx context.Context, configDirectory string, provisioner dashboards.Das
 		return nil, fmt.Errorf("%v: %w", "Failed to read dashboards config", err)
 	}
 
-	fileReaders, err := getFileReaders(configs, logger, provisioner, dashboardStore, folderService)
+	fileReaders, err := getFileReaders(configs, logger, provisioner, dashboardStore)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", "Failed to initialize file readers", err)
 	}
@@ -67,8 +66,6 @@ func New(ctx context.Context, configDirectory string, provisioner dashboards.Das
 // Provision scans the disk for dashboards and updates
 // the database with the latest versions of those dashboards.
 func (provider *Provisioner) Provision(ctx context.Context) error {
-	provider.log.Info("starting to provision dashboards")
-
 	for _, reader := range provider.fileReaders {
 		if err := reader.walkDisk(ctx); err != nil {
 			if os.IsNotExist(err) {
@@ -82,7 +79,6 @@ func (provider *Provisioner) Provision(ctx context.Context) error {
 	}
 
 	provider.duplicateValidator.validate()
-	provider.log.Info("finished to provision dashboards")
 	return nil
 }
 
@@ -131,24 +127,14 @@ func (provider *Provisioner) GetAllowUIUpdatesFromConfig(name string) bool {
 }
 
 func getFileReaders(
-	configs []*config,
-	logger log.Logger,
-	service dashboards.DashboardProvisioningService,
-	store utils.DashboardStore,
-	folderService folder.Service,
+	configs []*config, logger log.Logger, service dashboards.DashboardProvisioningService, store utils.DashboardStore,
 ) ([]*FileReader, error) {
 	var readers []*FileReader
 
 	for _, config := range configs {
 		switch config.Type {
 		case "file":
-			fileReader, err := NewDashboardFileReader(
-				config,
-				logger.New("type", config.Type, "name", config.Name),
-				service,
-				store,
-				folderService,
-			)
+			fileReader, err := NewDashboardFileReader(config, logger.New("type", config.Type, "name", config.Name), service, store)
 			if err != nil {
 				return nil, fmt.Errorf("failed to create file reader for config %v: %w", config.Name, err)
 			}

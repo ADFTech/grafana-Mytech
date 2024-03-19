@@ -2,7 +2,8 @@ import { of } from 'rxjs';
 
 import { CustomVariableModel, getFrameDisplayName, VariableHide } from '@grafana/data';
 import { dateTime } from '@grafana/data/src/datetime/moment_wrapper';
-import { toDataQueryResponse } from '@grafana/runtime';
+import { BackendDataSourceResponse } from '@grafana/runtime';
+import * as redux from 'app/store/store';
 
 import {
   namespaceVariable,
@@ -13,38 +14,21 @@ import {
   periodIntervalVariable,
   accountIdVariable,
 } from '../__mocks__/CloudWatchDataSource';
-import { initialVariableModelState } from '../__mocks__/CloudWatchVariables';
 import { setupMockedMetricsQueryRunner } from '../__mocks__/MetricsQueryRunner';
 import { validMetricSearchBuilderQuery, validMetricSearchCodeQuery } from '../__mocks__/queries';
-import { MetricQueryType, MetricEditorMode, CloudWatchMetricsQuery } from '../types';
-
-jest.mock('@grafana/runtime', () => ({
-  ...jest.requireActual('@grafana/runtime'),
-  getAppEvents: () => ({
-    publish: jest.fn(),
-  }),
-}));
+import { initialVariableModelState } from '../__mocks__/variables';
+import { MetricQueryType, MetricEditorMode, CloudWatchMetricsQuery, DataQueryError } from '../types';
 
 describe('CloudWatchMetricsQueryRunner', () => {
   describe('performTimeSeriesQuery', () => {
     it('should return the same length of data as result', async () => {
-      const resultsFromBEQuery = {
+      const { runner, timeRange, request, queryMock } = setupMockedMetricsQueryRunner({
         data: {
           results: {
-            a: {
-              refId: 'a',
-              series: [{ target: 'cpu', datapoints: [[1, 2]], meta: { custom: { period: 60 } } }],
-            },
-            b: {
-              refId: 'b',
-              series: [{ target: 'cpu', datapoints: [[1, 2]], meta: { custom: { period: 120 } } }],
-            },
+            a: { refId: 'a', series: [{ target: 'cpu', datapoints: [[1, 1]] }] },
+            b: { refId: 'b', series: [{ target: 'memory', datapoints: [[2, 2]] }] },
           },
         },
-      };
-      const { runner, timeRange, request, queryMock } = setupMockedMetricsQueryRunner({
-        // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-        response: toDataQueryResponse(resultsFromBEQuery),
       });
 
       const observable = runner.performTimeSeriesQuery(
@@ -63,7 +47,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
     });
 
     it('sets fields.config.interval based on period', async () => {
-      const resultsFromBEQuery = {
+      const { runner, timeRange, request, queryMock } = setupMockedMetricsQueryRunner({
         data: {
           results: {
             a: {
@@ -76,10 +60,6 @@ describe('CloudWatchMetricsQueryRunner', () => {
             },
           },
         },
-      };
-      const { runner, timeRange, request, queryMock } = setupMockedMetricsQueryRunner({
-        // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-        response: toDataQueryResponse(resultsFromBEQuery),
       });
 
       const observable = runner.performTimeSeriesQuery(
@@ -95,68 +75,6 @@ describe('CloudWatchMetricsQueryRunner', () => {
         const response = received[0];
         expect(response.data[0].fields[0].config.interval).toEqual(60000);
         expect(response.data[1].fields[0].config.interval).toEqual(120000);
-      });
-    });
-
-    it('should enrich the error message for throttling errors', async () => {
-      const partialQuery: CloudWatchMetricsQuery = {
-        metricQueryType: MetricQueryType.Search,
-        metricEditorMode: MetricEditorMode.Builder,
-        queryMode: 'Metrics',
-        namespace: 'AWS/EC2',
-        metricName: 'CPUUtilization',
-        dimensions: {
-          InstanceId: 'i-12345678',
-        },
-        statistic: 'Average',
-        period: '300',
-        expression: '',
-        id: '',
-        region: '',
-        refId: '',
-      };
-
-      const queries: CloudWatchMetricsQuery[] = [
-        { ...partialQuery, refId: 'A', region: 'us-east-1' },
-        { ...partialQuery, refId: 'B', region: 'us-east-2' },
-      ];
-
-      const dataWithThrottlingError = {
-        data: {
-          message: 'Throttling: exception',
-          results: {
-            A: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'A',
-              meta: {},
-            },
-            B: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'B',
-              meta: {},
-            },
-          },
-        },
-      };
-      const expectedUsEast1Message =
-        'Please visit the AWS Service Quotas console at https://us-east-1.console.aws.amazon.com/servicequotas/home?region=us-east-1#!/services/monitoring/quotas/L-5E141212 to request a quota increase or see our documentation at https://grafana.com/docs/grafana/latest/datasources/cloudwatch/#manage-service-quotas to learn more. Throttling: exception';
-      const expectedUsEast2Message =
-        'Please visit the AWS Service Quotas console at https://us-east-2.console.aws.amazon.com/servicequotas/home?region=us-east-2#!/services/monitoring/quotas/L-5E141212 to request a quota increase or see our documentation at https://grafana.com/docs/grafana/latest/datasources/cloudwatch/#manage-service-quotas to learn more. Throttling: exception';
-
-      const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
-        response: toDataQueryResponse(dataWithThrottlingError),
-      });
-
-      await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith((received) => {
-        expect(received[0].errors).toHaveLength(2);
-        expect(received[0]?.errors?.[0].message).toEqual(expectedUsEast1Message);
-        expect(received[0]?.errors?.[1].message).toEqual(expectedUsEast2Message);
       });
     });
 
@@ -180,36 +98,31 @@ describe('CloudWatchMetricsQueryRunner', () => {
         },
       ];
 
-      const resultsFromBEQuery = {
-        data: {
-          results: {
-            A: {
-              tables: [],
-              error: '',
-              refId: 'A',
-              series: [
-                {
-                  target: 'CPUUtilization_Average',
-                  datapoints: [
-                    [1, 1483228800000],
-                    [2, 1483229100000],
-                    [5, 1483229700000],
-                  ],
-                  tags: {
-                    InstanceId: 'i-12345678',
-                  },
+      const data: BackendDataSourceResponse = {
+        results: {
+          A: {
+            tables: [],
+            error: '',
+            refId: 'A',
+            series: [
+              {
+                target: 'CPUUtilization_Average',
+                datapoints: [
+                  [1, 1483228800000],
+                  [2, 1483229100000],
+                  [5, 1483229700000],
+                ],
+                tags: {
+                  InstanceId: 'i-12345678',
                 },
-              ],
-            },
+              },
+            ],
           },
         },
       };
 
       it('should generate the correct query', async () => {
-        const { runner, queryMock, request } = setupMockedMetricsQueryRunner({
-          // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-          response: toDataQueryResponse(resultsFromBEQuery),
-        });
+        const { runner, queryMock, request } = setupMockedMetricsQueryRunner({ data });
 
         await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith(() => {
           expect(queryMock.mock.calls[0][0].targets).toMatchObject(
@@ -246,8 +159,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
         ];
 
         const { runner, queryMock, request } = setupMockedMetricsQueryRunner({
-          // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-          response: toDataQueryResponse(resultsFromBEQuery),
+          data,
           variables: [periodIntervalVariable],
         });
 
@@ -257,104 +169,110 @@ describe('CloudWatchMetricsQueryRunner', () => {
       });
 
       it('should return series list', async () => {
-        const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
-          // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-          response: toDataQueryResponse(resultsFromBEQuery),
-        });
+        const { runner, request, queryMock } = setupMockedMetricsQueryRunner({ data });
 
         await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith((received) => {
           const result = received[0];
-          expect(getFrameDisplayName(result.data[0])).toBe('CPUUtilization_Average');
-          expect(result.data[0].fields[1].values[0]).toBe(1);
+          expect(getFrameDisplayName(result.data[0])).toBe(
+            data.results.A.series?.length && data.results.A.series[0].target
+          );
+          expect(result.data[0].fields[1].values[0]).toBe(
+            data.results.A.series?.length && data.results.A.series[0].datapoints[0][0]
+          );
         });
       });
-    });
-    describe('and throttling exception is thrown', () => {
-      const partialQuery: CloudWatchMetricsQuery = {
-        metricQueryType: MetricQueryType.Search,
-        metricEditorMode: MetricEditorMode.Builder,
-        queryMode: 'Metrics',
-        namespace: 'AWS/EC2',
-        metricName: 'CPUUtilization',
-        dimensions: {
-          InstanceId: 'i-12345678',
-        },
-        statistic: 'Average',
-        period: '300',
-        expression: '',
-        id: '',
-        region: '',
-        refId: '',
-      };
 
-      const queries: CloudWatchMetricsQuery[] = [
-        { ...partialQuery, refId: 'A', region: 'us-east-1' },
-        { ...partialQuery, refId: 'B', region: 'us-east-2' },
-        { ...partialQuery, refId: 'C', region: 'us-east-1' },
-        { ...partialQuery, refId: 'D', region: 'us-east-2' },
-        { ...partialQuery, refId: 'E', region: 'eu-north-1' },
-      ];
+      describe('and throttling exception is thrown', () => {
+        const partialQuery: CloudWatchMetricsQuery = {
+          metricQueryType: MetricQueryType.Search,
+          metricEditorMode: MetricEditorMode.Builder,
+          queryMode: 'Metrics',
+          namespace: 'AWS/EC2',
+          metricName: 'CPUUtilization',
+          dimensions: {
+            InstanceId: 'i-12345678',
+          },
+          statistic: 'Average',
+          period: '300',
+          expression: '',
+          id: '',
+          region: '',
+          refId: '',
+        };
 
-      const dataWithThrottlingError = {
-        data: {
-          message: 'Throttling: exception',
-          results: {
-            A: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'A',
-              meta: {},
-            },
-            B: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'B',
-              meta: {},
-            },
-            C: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'C',
-              meta: {},
-            },
-            D: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'D',
-              meta: {},
-            },
-            E: {
-              frames: [],
-              series: [],
-              tables: [],
-              error: 'Throttling: exception',
-              refId: 'E',
-              meta: {},
+        const queries: CloudWatchMetricsQuery[] = [
+          { ...partialQuery, refId: 'A', region: 'us-east-1' },
+          { ...partialQuery, refId: 'B', region: 'us-east-2' },
+          { ...partialQuery, refId: 'C', region: 'us-east-1' },
+          { ...partialQuery, refId: 'D', region: 'us-east-2' },
+          { ...partialQuery, refId: 'E', region: 'eu-north-1' },
+        ];
+
+        const backendErrorResponse: DataQueryError<CloudWatchMetricsQuery> = {
+          data: {
+            message: 'Throttling: exception',
+            results: {
+              A: {
+                frames: [],
+                series: [],
+                tables: [],
+                error: 'Throttling: exception',
+                refId: 'A',
+                meta: {},
+              },
+              B: {
+                frames: [],
+                series: [],
+                tables: [],
+                error: 'Throttling: exception',
+                refId: 'B',
+                meta: {},
+              },
+              C: {
+                frames: [],
+                series: [],
+                tables: [],
+                error: 'Throttling: exception',
+                refId: 'C',
+                meta: {},
+              },
+              D: {
+                frames: [],
+                series: [],
+                tables: [],
+                error: 'Throttling: exception',
+                refId: 'D',
+                meta: {},
+              },
+              E: {
+                frames: [],
+                series: [],
+                tables: [],
+                error: 'Throttling: exception',
+                refId: 'E',
+                meta: {},
+              },
             },
           },
-        },
-      };
+        };
 
-      it('should display one alert error message per region+datasource combination', async () => {
-        const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
-          response: toDataQueryResponse(dataWithThrottlingError),
+        beforeEach(() => {
+          redux.setStore({
+            ...redux.store,
+            dispatch: jest.fn(),
+          });
         });
-        const memoizedDebounceSpy = jest.spyOn(runner, 'debouncedThrottlingAlert');
 
-        await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith((received) => {
-          expect(received[0].errors).toHaveLength(5);
-          expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'us-east-1');
-          expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'us-east-2');
-          expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'eu-north-1');
-          expect(memoizedDebounceSpy).toBeCalledTimes(3);
+        it('should display one alert error message per region+datasource combination', async () => {
+          const { runner, request, queryMock } = setupMockedMetricsQueryRunner({ errorResponse: backendErrorResponse });
+          const memoizedDebounceSpy = jest.spyOn(runner, 'debouncedAlert');
+
+          await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith(() => {
+            expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'us-east-1');
+            expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'us-east-2');
+            expect(memoizedDebounceSpy).toHaveBeenCalledWith('CloudWatch Test Datasource', 'eu-north-1');
+            expect(memoizedDebounceSpy).toBeCalledTimes(3);
+          });
         });
       });
     });
@@ -380,78 +298,41 @@ describe('CloudWatchMetricsQueryRunner', () => {
       },
     ];
 
-    const responseFromBEQuery = {
-      data: {
-        results: {
-          A: {
-            tables: [],
-            error: '',
-            refId: 'A',
-            series: [
-              {
-                target: 'TargetResponseTime_p90.00',
-                datapoints: [
-                  [1, 1483228800000],
-                  [2, 1483229100000],
-                  [5, 1483229700000],
-                ],
-                tags: {
-                  LoadBalancer: 'lb',
-                  TargetGroup: 'tg',
-                },
+    const data: BackendDataSourceResponse = {
+      results: {
+        A: {
+          tables: [],
+          error: '',
+          refId: 'A',
+          series: [
+            {
+              target: 'TargetResponseTime_p90.00',
+              datapoints: [
+                [1, 1483228800000],
+                [2, 1483229100000],
+                [5, 1483229700000],
+              ],
+              tags: {
+                LoadBalancer: 'lb',
+                TargetGroup: 'tg',
               },
-            ],
-          },
+            },
+          ],
         },
       },
     };
 
     it('should return series list', async () => {
-      const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
-        // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-        response: toDataQueryResponse(responseFromBEQuery),
-      });
+      const { runner, request, queryMock } = setupMockedMetricsQueryRunner({ data });
 
       await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith((received) => {
         const result = received[0];
         expect(getFrameDisplayName(result.data[0])).toBe(
-          responseFromBEQuery.data.results.A.series?.length && responseFromBEQuery.data.results.A.series[0].target
+          data.results.A.series?.length && data.results.A.series[0].target
         );
         expect(result.data[0].fields[1].values[0]).toBe(
-          responseFromBEQuery.data.results.A.series?.length &&
-            responseFromBEQuery.data.results.A.series[0].datapoints[0][0]
+          data.results.A.series?.length && data.results.A.series[0].datapoints[0][0]
         );
-      });
-    });
-    it('should pass the error list from DatasourceWithBackend srv', async () => {
-      const dataWithError = {
-        data: {
-          results: {
-            A: {
-              error:
-                "metric request error: \"ValidationError: Error in expression 'query': Invalid syntax\\n\\tstatus code: 400",
-              status: 500,
-            },
-          },
-        },
-        status: 500,
-        statusText: 'Internal Server Error',
-      };
-      const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
-        // DataSourceWithBackend runs toDataQueryResponse({response from CW backend})
-        response: toDataQueryResponse(dataWithError),
-      });
-      await expect(runner.handleMetricQueries(queries, request, queryMock)).toEmitValuesWith((received) => {
-        const result = received[0];
-        expect(result.data).toEqual([]);
-        expect(result.errors).toEqual([
-          {
-            message:
-              "metric request error: \"ValidationError: Error in expression 'query': Invalid syntax\\n\\tstatus code: 400",
-            status: 500,
-            refId: 'A',
-          },
-        ]);
       });
     });
   });
@@ -477,7 +358,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
 
     it('interpolates variables correctly', async () => {
       const { runner, queryMock, request } = setupMockedMetricsQueryRunner({
-        variables: [namespaceVariable, metricVariable, limitVariable],
+        variables: [namespaceVariable, metricVariable, labelsVariable, limitVariable],
       });
       runner.handleMetricQueries(
         [
@@ -495,7 +376,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
             expression: '',
             metricQueryType: MetricQueryType.Query,
             metricEditorMode: MetricEditorMode.Code,
-            sqlExpression: 'SELECT SUM($metric) FROM "$namespace" GROUP BY InstanceId,InstanceType LIMIT $limit',
+            sqlExpression: 'SELECT SUM($metric) FROM "$namespace" GROUP BY ${labels:raw} LIMIT $limit',
           },
         ],
         request,
@@ -773,28 +654,8 @@ describe('CloudWatchMetricsQueryRunner', () => {
     beforeEach(() => {
       const { runner, request, queryMock } = setupMockedMetricsQueryRunner({
         variables: [
-          {
-            ...namespaceVariable,
-            current: {
-              value: ['AWS/Redshift', 'AWS/EC2'],
-              text: ['AWS/Redshift', 'AWS/EC2'].toString(),
-              selected: true,
-            },
-            multi: true,
-          },
-          {
-            ...metricVariable,
-            current: {
-              value: ['CPUUtilization', 'DroppedBytes'],
-              text: ['CPUUtilization', 'DroppedBytes'].toString(),
-              selected: true,
-            },
-            multi: true,
-          },
-          {
-            ...dimensionVariable,
-            multi: true,
-          },
+          { ...namespaceVariable, multi: true },
+          { ...metricVariable, multi: true },
         ],
       });
       runner.debouncedCustomAlert = debouncedAlert;
@@ -805,11 +666,11 @@ describe('CloudWatchMetricsQueryRunner', () => {
             queryMode: 'Metrics',
             id: '',
             region: 'us-east-2',
-            namespace: '$' + namespaceVariable.name,
-            metricName: '$' + metricVariable.name,
+            namespace: namespaceVariable.id,
+            metricName: metricVariable.id,
             period: '',
             alias: '',
-            dimensions: { [`$${dimensionVariable.name}`]: '' },
+            dimensions: {},
             matchExact: true,
             statistic: '',
             refId: '',
@@ -822,7 +683,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
         queryMock
       );
     });
-    it('should show debounced alert for namespace and metric name when multiple options are selected', async () => {
+    it('should show debounced alert for namespace and metric name', async () => {
       expect(debouncedAlert).toHaveBeenCalledWith(
         'CloudWatch templating error',
         'Multi template variables are not supported for namespace'
@@ -830,13 +691,6 @@ describe('CloudWatchMetricsQueryRunner', () => {
       expect(debouncedAlert).toHaveBeenCalledWith(
         'CloudWatch templating error',
         'Multi template variables are not supported for metric name'
-      );
-    });
-
-    it('should not show debounced alert for a multi-variable if it only has one option selected', async () => {
-      expect(debouncedAlert).not.toHaveBeenCalledWith(
-        'CloudWatch templating error',
-        `Multi template variables are not supported for dimension keys`
       );
     });
 
@@ -858,7 +712,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
         sqlExpression: 'select SUM(CPUUtilization) from $datasource',
         dimensions: { InstanceId: '$dimension' },
       };
-      const { runner } = setupMockedMetricsQueryRunner({ variables: [dimensionVariable] });
+      const { runner } = setupMockedMetricsQueryRunner({ variables: [dimensionVariable], mockGetVariableName: false });
       const result = runner.interpolateMetricsQueryVariables(testQuery, {
         datasource: { text: 'foo', value: 'foo' },
         dimension: { text: 'foo', value: 'foo' },
@@ -878,6 +732,7 @@ describe('CloudWatchMetricsQueryRunner', () => {
   describe('convertMultiFiltersFormat', () => {
     const { runner } = setupMockedMetricsQueryRunner({
       variables: [labelsVariable, dimensionVariable],
+      mockGetVariableName: false,
     });
     it('converts keys and values correctly', () => {
       const filters = { $dimension: ['b'], a: ['$labels', 'bar'] };

@@ -4,8 +4,9 @@ import React, { useCallback, useState } from 'react';
 import { selectors } from '@grafana/e2e-selectors';
 import { TextArea, useStyles2 } from '@grafana/ui';
 
-import { getStyles } from '../../dashboard-scene/settings/variables/components/VariableTextAreaField';
 import { VariableQueryEditorProps } from '../types';
+
+import { getStyles } from './VariableTextAreaField';
 
 export const LEGACY_VARIABLE_QUERY_EDITOR_NAME = 'Grafana-LegacyVariableQueryEditor';
 
@@ -34,7 +35,7 @@ export const LegacyVariableQueryEditor = ({ onChange, query }: VariableQueryEdit
       onBlur={onBlur}
       placeholder="Metric name or tags query"
       required
-      data-testid={selectors.pages.Dashboard.Settings.Variables.Edit.QueryVariable.queryOptionsQueryInput}
+      aria-label={selectors.pages.Dashboard.Settings.Variables.Edit.QueryVariable.queryOptionsQueryInput}
       cols={52}
       className={styles.textarea}
     />

@@ -4,7 +4,7 @@
 //     public/app/plugins/gen.go
 // Using jennies:
 //     TSTypesJenny
-//     PluginTsTypesJenny
+//     PluginTSTypesJenny
 //
 // Run 'make gen-cue' from repository root to regenerate.
 
@@ -23,7 +23,6 @@ export enum LokiQueryType {
 
 export enum SupportingQueryType {
   DataSample = 'dataSample',
-  InfiniteScroll = 'infiniteScroll',
   LogsSample = 'logsSample',
   LogsVolume = 'logsVolume',
 }
@@ -33,7 +32,7 @@ export enum LokiQueryDirection {
   Forward = 'forward',
 }
 
-export interface LokiDataQuery extends common.DataQuery {
+export interface Loki extends common.DataQuery {
   editorMode?: QueryEditorMode;
   /**
    * The LogQL query.

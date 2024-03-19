@@ -2,15 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useObservable } from 'react-use';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-import {
-  ApplyFieldOverrideOptions,
-  DataConfigSource,
-  dateMath,
-  FieldColorModeId,
-  NavModelItem,
-  PanelData,
-} from '@grafana/data';
+import { ApplyFieldOverrideOptions, dateMath, FieldColorModeId, NavModelItem, PanelData } from '@grafana/data';
 import { getPluginExtensions, isPluginExtensionLink } from '@grafana/runtime';
+import { DataTransformerConfig } from '@grafana/schema';
 import { Button, HorizontalGroup, LinkButton, Table } from '@grafana/ui';
 import { Page } from 'app/core/components/Page/Page';
 import { config } from 'app/core/config';
@@ -135,8 +129,8 @@ export function getDefaultState(): State {
     theme: config.theme2,
   };
 
-  const dataConfig: DataConfigSource = {
-    getTransformations: () => [],
+  const dataConfig = {
+    getTransformations: () => [] as DataTransformerConfig[],
     getFieldOverrideOptions: () => options,
     getDataSupport: () => ({ annotations: false, alertStates: false }),
   };

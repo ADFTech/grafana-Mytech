@@ -1,21 +1,12 @@
 import { css } from '@emotion/css';
 import React from 'react';
 
-import { GrafanaTheme2 } from '@grafana/data';
-import { LinkButton, CallToActionCard, Icon, useStyles2 } from '@grafana/ui';
+import { LinkButton, CallToActionCard, Icon, useTheme2 } from '@grafana/ui';
 import { contextSrv } from 'app/core/core';
 import { AccessControlAction } from 'app/types';
 
-function getCardStyles(theme: GrafanaTheme2) {
-  return css({
-    maxWidth: `${theme.breakpoints.values.lg}px`,
-    marginTop: theme.spacing(2),
-    alignSelf: 'center',
-  });
-}
-
 export const NoDataSourceCallToAction = () => {
-  const cardStyles = useStyles2(getCardStyles);
+  const theme = useTheme2();
 
   const canCreateDataSource =
     contextSrv.hasPermission(AccessControlAction.DataSourcesCreate) &&
@@ -44,5 +35,13 @@ export const NoDataSourceCallToAction = () => {
     </LinkButton>
   );
 
-  return <CallToActionCard callToActionElement={ctaElement} className={cardStyles} footer={footer} message={message} />;
+  const cardClassName = css`
+    max-width: ${theme.breakpoints.values.lg}px;
+    margin-top: ${theme.spacing(2)};
+    align-self: center;
+  `;
+
+  return (
+    <CallToActionCard callToActionElement={ctaElement} className={cardClassName} footer={footer} message={message} />
+  );
 };

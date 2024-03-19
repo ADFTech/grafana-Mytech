@@ -1,15 +1,8 @@
-import React, { CSSProperties } from 'react';
+import React from 'react';
 
-import { CloseButton } from 'app/core/components/CloseButton/CloseButton';
+import { CloseButton } from '../../../core/components/CloseButton/CloseButton';
 
-export function ExemplarModalHeader(props: { onClick: () => void; style?: React.CSSProperties }) {
-  const defaultStyle: CSSProperties = {
-    position: 'relative',
-    top: 'auto',
-    right: 'auto',
-    marginRight: 0,
-  };
-
+export function ExemplarModalHeader(props: { onClick: () => void }) {
   return (
     <div
       style={{
@@ -19,7 +12,15 @@ export function ExemplarModalHeader(props: { onClick: () => void; style?: React.
         paddingBottom: '6px',
       }}
     >
-      <CloseButton onClick={props.onClick} style={props.style ?? defaultStyle} />
+      <CloseButton
+        onClick={props.onClick}
+        style={{
+          position: 'relative',
+          top: 'auto',
+          right: 'auto',
+          marginRight: 0,
+        }}
+      />
     </div>
   );
 }

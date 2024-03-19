@@ -100,7 +100,7 @@ export function ExploreToolbar({ exploreId, onChangeTime, onContentOutlineToogle
 
   const onChangeDatasource = async (dsSettings: DataSourceInstanceSettings) => {
     if (!isCorrelationsEditorMode) {
-      dispatch(changeDatasource({ exploreId, datasource: dsSettings.uid, options: { importQueries: true } }));
+      dispatch(changeDatasource(exploreId, dsSettings.uid, { importQueries: true }));
     } else {
       if (correlationDetails?.correlationDirty || correlationDetails?.queryEditorDirty) {
         // prompt will handle datasource change if needed
@@ -128,7 +128,7 @@ export function ExploreToolbar({ exploreId, onChangeTime, onContentOutlineToogle
           });
         }
 
-        dispatch(changeDatasource({ exploreId, datasource: dsSettings.uid, options: { importQueries: true } }));
+        dispatch(changeDatasource(exploreId, dsSettings.uid, { importQueries: true }));
       }
     }
   };
@@ -273,7 +273,12 @@ export function ExploreToolbar({ exploreId, onChangeTime, onContentOutlineToogle
               </ToolbarButton>
             </ButtonGroup>
           ),
-          <ToolbarExtensionPoint key="toolbar-extension-point" exploreId={exploreId} timeZone={timeZone} />,
+          <ToolbarExtensionPoint
+            splitted={splitted}
+            key="toolbar-extension-point"
+            exploreId={exploreId}
+            timeZone={timeZone}
+          />,
           !isLive && (
             <ExploreTimeControls
               key="timeControls"

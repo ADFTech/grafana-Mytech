@@ -275,16 +275,17 @@ func (d *AlertsRouter) buildExternalURL(ds *datasources.DataSource) (string, err
 		}
 	}
 
-	// If basic auth is enabled we need to build the url with basic auth baked in.
-	if ds.BasicAuth {
-		password := d.secretService.GetDecryptedValue(context.Background(), ds.SecureJsonData, "basicAuthPassword", "")
-		if password == "" {
-			return "", fmt.Errorf("basic auth enabled but no password set")
-		}
-		parsed.User = url.UserPassword(ds.BasicAuthUser, password)
+	// if basic auth is enabled we need to build the url with basic auth baked in
+	if !ds.BasicAuth {
+		return parsed.String(), nil
 	}
 
-	return parsed.String(), nil
+	password := d.secretService.GetDecryptedValue(context.Background(), ds.SecureJsonData, "basicAuthPassword", "")
+	if password == "" {
+		return "", fmt.Errorf("basic auth enabled but no password set")
+	}
+	return fmt.Sprintf("%s://%s:%s@%s%s%s", parsed.Scheme, ds.BasicAuthUser,
+		password, parsed.Host, parsed.Path, parsed.RawQuery), nil
 }
 
 func (d *AlertsRouter) Send(ctx context.Context, key models.AlertRuleKey, alerts definitions.PostableAlerts) {

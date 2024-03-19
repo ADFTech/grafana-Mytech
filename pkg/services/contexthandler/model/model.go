@@ -43,7 +43,7 @@ func (ctx *ReqContext) Handle(cfg *setting.Cfg, status int, title string, err er
 		Title     string
 		AppTitle  string
 		AppSubUrl string
-		ThemeType string
+		Theme     string
 		ErrorMsg  error
 	}{title, "Grafana", cfg.AppSubURL, "dark", nil}
 

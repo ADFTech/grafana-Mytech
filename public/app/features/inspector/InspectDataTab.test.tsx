@@ -1,21 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import React, { ComponentProps } from 'react';
-import { Props } from 'react-virtualized-auto-sizer';
 
 import { DataFrame, FieldType } from '@grafana/data';
 
 import { InspectDataTab } from './InspectDataTab';
-
-jest.mock('react-virtualized-auto-sizer', () => {
-  return ({ children }: Props) =>
-    children({
-      height: 1,
-      scaledHeight: 1,
-      scaledWidth: 1,
-      width: 1,
-    });
-});
 
 const createProps = (propsOverride?: Partial<ComponentProps<typeof InspectDataTab>>) => {
   const defaultProps = {
@@ -28,18 +17,18 @@ const createProps = (propsOverride?: Partial<ComponentProps<typeof InspectDataTa
       {
         name: 'First data frame',
         fields: [
-          { name: 'time', type: FieldType.time, values: [100, 200, 300], config: {} },
-          { name: 'name', type: FieldType.string, values: ['uniqueA', 'b', 'c'], config: {} },
-          { name: 'value', type: FieldType.number, values: [1, 2, 3], config: {} },
+          { name: 'time', type: FieldType.time, values: [100, 200, 300] },
+          { name: 'name', type: FieldType.string, values: ['uniqueA', 'b', 'c'] },
+          { name: 'value', type: FieldType.number, values: [1, 2, 3] },
         ],
         length: 3,
       },
       {
         name: 'Second data frame',
         fields: [
-          { name: 'time', type: FieldType.time, values: [400, 500, 600], config: {} },
-          { name: 'name', type: FieldType.string, values: ['d', 'e', 'g'], config: {} },
-          { name: 'value', type: FieldType.number, values: [4, 5, 6], config: {} },
+          { name: 'time', type: FieldType.time, values: [400, 500, 600] },
+          { name: 'name', type: FieldType.string, values: ['d', 'e', 'g'] },
+          { name: 'value', type: FieldType.number, values: [4, 5, 6] },
         ],
         length: 3,
       },
@@ -79,9 +68,9 @@ describe('InspectDataTab', () => {
         {
           name: 'Data frame with logs',
           fields: [
-            { name: 'time', type: FieldType.time, values: [100, 200, 300], config: {} },
-            { name: 'name', type: FieldType.string, values: ['uniqueA', 'b', 'c'], config: {} },
-            { name: 'value', type: FieldType.number, values: [1, 2, 3], config: {} },
+            { name: 'time', type: FieldType.time, values: [100, 200, 300] },
+            { name: 'name', type: FieldType.string, values: ['uniqueA', 'b', 'c'] },
+            { name: 'value', type: FieldType.number, values: [1, 2, 3] },
           ],
           length: 3,
           meta: {
@@ -101,15 +90,11 @@ describe('InspectDataTab', () => {
         {
           name: 'Data frame with traces',
           fields: [
-            { name: 'traceID', values: ['3fa414edcef6ad90', '3fa414edcef6ad90'], config: {} },
-            { name: 'spanID', values: ['3fa414edcef6ad90', '0f5c1808567e4403'], config: {} },
-            { name: 'parentSpanID', values: [undefined, '3fa414edcef6ad90'], config: {} },
-            {
-              name: 'operationName',
-              values: ['HTTP GET - api_traces_traceid', '/tempopb.Querier/FindTraceByID'],
-              config: {},
-            },
-            { name: 'serviceName', values: ['tempo-querier', 'tempo-querier'], config: {} },
+            { name: 'traceID', values: ['3fa414edcef6ad90', '3fa414edcef6ad90'] },
+            { name: 'spanID', values: ['3fa414edcef6ad90', '0f5c1808567e4403'] },
+            { name: 'parentSpanID', values: [undefined, '3fa414edcef6ad90'] },
+            { name: 'operationName', values: ['HTTP GET - api_traces_traceid', '/tempopb.Querier/FindTraceByID'] },
+            { name: 'serviceName', values: ['tempo-querier', 'tempo-querier'] },
             {
               name: 'serviceTags',
               values: [
@@ -122,11 +107,10 @@ describe('InspectDataTab', () => {
                   { key: 'container', type: 'string', value: 'tempo-query' },
                 ],
               ],
-              config: {},
             },
-            { name: 'startTime', values: [1605873894680.409, 1605873894680.587], config: {} },
-            { name: 'duration', values: [1049.141, 1.847], config: {} },
-            { name: 'logs', values: [[], []], config: {} },
+            { name: 'startTime', values: [1605873894680.409, 1605873894680.587] },
+            { name: 'duration', values: [1049.141, 1.847] },
+            { name: 'logs', values: [[], []] },
             {
               name: 'tags',
               values: [
@@ -139,10 +123,9 @@ describe('InspectDataTab', () => {
                   { key: 'span.kind', type: 'string', value: 'client' },
                 ],
               ],
-              config: {},
             },
-            { name: 'warnings', values: [undefined, undefined], config: {} },
-            { name: 'stackTraces', values: [undefined, undefined], config: {} },
+            { name: 'warnings', values: [undefined, undefined] },
+            { name: 'stackTraces', values: [undefined, undefined] },
           ],
           length: 2,
           meta: {
@@ -168,7 +151,6 @@ describe('InspectDataTab', () => {
           meta: {
             preferredVisualisationType: 'nodeGraph',
           },
-          config: {},
         },
         {
           name: 'Edges',
@@ -176,7 +158,6 @@ describe('InspectDataTab', () => {
           meta: {
             preferredVisualisationType: 'nodeGraph',
           },
-          config: {},
         },
       ] as unknown as DataFrame[];
       render(

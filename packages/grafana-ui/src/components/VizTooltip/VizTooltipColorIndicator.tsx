@@ -8,15 +8,9 @@ import { useStyles2 } from '../../themes';
 import { ColorIndicator, DEFAULT_COLOR_INDICATOR } from './types';
 import { getColorIndicatorClass } from './utils';
 
-export enum ColorIndicatorPosition {
-  Leading,
-  Trailing,
-}
-
 interface Props {
   color?: string;
   colorIndicator?: ColorIndicator;
-  position?: ColorIndicatorPosition;
 }
 
 export type ColorIndicatorStyles = ReturnType<typeof getStyles>;
@@ -24,28 +18,21 @@ export type ColorIndicatorStyles = ReturnType<typeof getStyles>;
 export const VizTooltipColorIndicator = ({
   color = FALLBACK_COLOR,
   colorIndicator = DEFAULT_COLOR_INDICATOR,
-  position = ColorIndicatorPosition.Leading,
 }: Props) => {
   const styles = useStyles2(getStyles);
 
   return (
     <span
       style={{ backgroundColor: color }}
-      className={cx(
-        position === ColorIndicatorPosition.Leading ? styles.leading : styles.trailing,
-        getColorIndicatorClass(colorIndicator, styles)
-      )}
+      className={cx(styles.colorIndicator, getColorIndicatorClass(colorIndicator, styles))}
     />
   );
 };
 
 // @TODO Update classes/add svgs
 const getStyles = (theme: GrafanaTheme2) => ({
-  leading: css({
+  colorIndicator: css({
     marginRight: theme.spacing(0.5),
-  }),
-  trailing: css({
-    marginLeft: theme.spacing(0.5),
   }),
   series: css({
     width: '14px',

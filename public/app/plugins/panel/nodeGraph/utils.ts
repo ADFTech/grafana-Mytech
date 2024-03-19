@@ -86,13 +86,8 @@ export type EdgeFields = {
   mainStat?: Field;
   secondaryStat?: Field;
   details: Field[];
-  /**
-   * @deprecated use `color` instead
-   */
   highlighted?: Field;
   thickness?: Field;
-  color?: Field;
-  strokeDasharray?: Field;
 };
 
 export function getEdgeFields(edges: DataFrame): EdgeFields {
@@ -108,11 +103,8 @@ export function getEdgeFields(edges: DataFrame): EdgeFields {
     mainStat: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.mainStat.toLowerCase()),
     secondaryStat: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.secondaryStat.toLowerCase()),
     details: findFieldsByPrefix(edges, NodeGraphDataFrameFieldNames.detail.toLowerCase()),
-    // @deprecated -- for edges use color instead
     highlighted: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.highlighted.toLowerCase()),
     thickness: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.thickness.toLowerCase()),
-    color: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.color.toLowerCase()),
-    strokeDasharray: fieldsCache.getFieldByName(NodeGraphDataFrameFieldNames.strokeDasharray.toLowerCase()),
   };
 }
 
@@ -242,11 +234,8 @@ function processEdges(edges: DataFrame, edgeFields: EdgeFields, nodesMap: { [id:
       secondaryStat: edgeFields.secondaryStat
         ? statToString(edgeFields.secondaryStat.config, edgeFields.secondaryStat.values[index])
         : '',
-      // @deprecated -- for edges use color instead
       highlighted: edgeFields.highlighted?.values[index] || false,
       thickness: edgeFields.thickness?.values[index] || 1,
-      color: edgeFields.color?.values[index],
-      strokeDasharray: edgeFields.strokeDasharray?.values[index],
     };
   });
 }
@@ -381,7 +370,7 @@ function makeNode(index: number) {
 }
 
 function nodesFrame() {
-  const fields = {
+  const fields: any = {
     [NodeGraphDataFrameFieldNames.id]: {
       values: [],
       type: FieldType.string,
@@ -405,17 +394,17 @@ function nodesFrame() {
     [NodeGraphDataFrameFieldNames.arc + 'success']: {
       values: [],
       type: FieldType.number,
-      config: { color: { mode: FieldColorModeId.Fixed, fixedColor: 'green' } },
+      config: { color: { fixedColor: 'green' } },
     },
     [NodeGraphDataFrameFieldNames.arc + 'errors']: {
       values: [],
       type: FieldType.number,
-      config: { color: { mode: FieldColorModeId.Fixed, fixedColor: 'red' } },
+      config: { color: { fixedColor: 'red' } },
     },
     [NodeGraphDataFrameFieldNames.color]: {
       values: [],
       type: FieldType.number,
-      config: { color: { mode: FieldColorModeId.ContinuousGrYlRd } },
+      config: { color: { mode: 'continuous-GrYlRd' } },
     },
     [NodeGraphDataFrameFieldNames.icon]: {
       values: [],
@@ -429,8 +418,8 @@ function nodesFrame() {
 
   return new MutableDataFrame({
     name: 'nodes',
-    fields: Object.entries(fields).map(([key, value]) => ({
-      ...value,
+    fields: Object.keys(fields).map((key) => ({
+      ...fields[key],
       name: key,
     })),
   });
@@ -451,7 +440,7 @@ export function makeEdgesDataFrame(
 }
 
 function edgesFrame() {
-  const fields = {
+  const fields: any = {
     [NodeGraphDataFrameFieldNames.id]: {
       values: [],
       type: FieldType.string,
@@ -476,8 +465,8 @@ function edgesFrame() {
 
   return new MutableDataFrame({
     name: 'edges',
-    fields: Object.entries(fields).map(([key, value]) => ({
-      ...value,
+    fields: Object.keys(fields).map((key) => ({
+      ...fields[key],
       name: key,
     })),
   });

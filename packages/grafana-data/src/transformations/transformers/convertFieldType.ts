@@ -28,10 +28,6 @@ export interface ConvertFieldTypeOptions {
    */
   dateFormat?: string;
   /**
-   * When converting an array to a string, the values can be joined with a custom separator
-   */
-  joinWith?: string;
-  /**
    * When converting a date to a string an option timezone.
    */
   timezone?: TimeZone;
@@ -107,7 +103,7 @@ export function convertFieldType(field: Field, opts: ConvertFieldTypeOptions): F
     case FieldType.number:
       return fieldToNumberField(field);
     case FieldType.string:
-      return fieldToStringField(field, opts.dateFormat, { timeZone: opts.timezone }, opts.joinWith);
+      return fieldToStringField(field, opts.dateFormat, { timeZone: opts.timezone });
     case FieldType.boolean:
       return fieldToBooleanField(field);
     case FieldType.enum:
@@ -196,8 +192,7 @@ function fieldToBooleanField(field: Field): Field {
 export function fieldToStringField(
   field: Field,
   dateFormat?: string,
-  parseOptions?: DateTimeOptionsWhenParsing,
-  joinWith?: string
+  parseOptions?: DateTimeOptionsWhenParsing
 ): Field {
   let values = field.values;
 
@@ -207,12 +202,7 @@ export function fieldToStringField(
       break;
 
     case FieldType.other:
-      values = values.map((v) => {
-        if (joinWith?.length && Array.isArray(v)) {
-          return v.join(joinWith);
-        }
-        return JSON.stringify(v); // will quote strings and avoid "object"
-      });
+      values = values.map((v) => JSON.stringify(v));
       break;
 
     default:

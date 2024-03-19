@@ -6,5 +6,3 @@ export const SETTINGS_KEYS = {
   logsSortOrder: 'grafana.explore.logs.sortOrder',
   logContextWrapLogMessage: 'grafana.explore.logs.logContext.wrapLogMessage',
 };
-
-export const visualisationTypeKey = 'grafana.explore.logs.visualisationType';

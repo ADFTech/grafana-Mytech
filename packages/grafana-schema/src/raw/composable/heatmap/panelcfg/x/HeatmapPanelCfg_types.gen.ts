@@ -4,13 +4,14 @@
 //     public/app/plugins/gen.go
 // Using jennies:
 //     TSTypesJenny
-//     PluginTsTypesJenny
+//     LatestMajorsOrXJenny
+//     PluginEachMajorJenny
 //
 // Run 'make gen-cue' from repository root to regenerate.
 
 import * as ui from '@grafana/schema';
 
-export const pluginVersion = "11.0.0-pre";
+export const pluginVersion = "10.3.0-pre";
 
 /**
  * Controls the color mode of the heatmap
@@ -128,12 +129,10 @@ export interface FilterValueRange {
  * Controls tooltip options
  */
 export interface HeatmapTooltip {
-  maxHeight?: number;
-  maxWidth?: number;
   /**
-   * Controls how the tooltip is shown
+   * Controls if the tooltip is shown
    */
-  mode: ui.TooltipDisplayMode;
+  show: boolean;
   /**
    * Controls if the tooltip shows a color scale in header
    */
@@ -267,7 +266,7 @@ export const defaultOptions: Partial<Options> = {
   },
   showValue: ui.VisibilityMode.Auto,
   tooltip: {
-    mode: ui.TooltipDisplayMode.Single,
+    show: true,
     yHistogram: false,
     showColorScale: false,
   },

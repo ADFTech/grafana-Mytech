@@ -9,31 +9,17 @@ type CommonProps = {
   icon: string;
   tooltip?: string;
   className?: string;
-  isActive?: boolean;
 };
 
 export type ContentOutlineItemButtonProps = CommonProps & ButtonHTMLAttributes<HTMLButtonElement>;
 
-export function ContentOutlineItemButton({
-  title,
-  icon,
-  tooltip,
-  className,
-  isActive,
-  ...rest
-}: ContentOutlineItemButtonProps) {
+export function ContentOutlineItemButton({ title, icon, tooltip, className, ...rest }: ContentOutlineItemButtonProps) {
   const styles = useStyles2(getStyles);
 
   const buttonStyles = cx(styles.button, className);
 
   const body = (
-    <button
-      className={cx(buttonStyles, {
-        [styles.active]: isActive,
-      })}
-      aria-label={tooltip}
-      {...rest}
-    >
+    <button className={buttonStyles} aria-label={tooltip} {...rest}>
       {renderIcon(icon)}
       {title}
     </button>
@@ -80,24 +66,6 @@ const getStyles = (theme: GrafanaTheme2) => {
         color: theme.colors.text.primary,
         background: theme.colors.background.secondary,
         textDecoration: 'underline',
-      },
-    }),
-    active: css({
-      backgroundColor: theme.colors.background.secondary,
-      borderTopRightRadius: theme.shape.radius.default,
-      borderBottomRightRadius: theme.shape.radius.default,
-      position: 'relative',
-
-      '&::before': {
-        backgroundImage: theme.colors.gradients.brandVertical,
-        borderRadius: theme.shape.radius.default,
-        content: '" "',
-        display: 'block',
-        height: '100%',
-        position: 'absolute',
-        transform: 'translateX(-50%)',
-        width: theme.spacing(0.5),
-        left: '2px',
       },
     }),
   };

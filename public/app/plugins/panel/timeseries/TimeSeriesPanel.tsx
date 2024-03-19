@@ -1,17 +1,10 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo } from 'react';
 
-import { PanelProps, DataFrameType, DashboardCursorSync } from '@grafana/data';
+import { PanelProps, DataFrameType } from '@grafana/data';
 import { PanelDataErrorView } from '@grafana/runtime';
-import { TooltipDisplayMode, VizOrientation } from '@grafana/schema';
-import {
-  EventBusPlugin,
-  KeyboardPlugin,
-  TooltipPlugin,
-  TooltipPlugin2,
-  usePanelContext,
-  ZoomPlugin,
-} from '@grafana/ui';
-import { TimeRange2, TooltipHoverMode } from '@grafana/ui/src/components/uPlot/plugins/TooltipPlugin2';
+import { TooltipDisplayMode } from '@grafana/schema';
+import { KeyboardPlugin, TooltipPlugin, TooltipPlugin2, usePanelContext, ZoomPlugin } from '@grafana/ui';
+import { TooltipHoverMode } from '@grafana/ui/src/components/uPlot/plugins/TooltipPlugin2';
 import { TimeSeries } from 'app/core/components/TimeSeries/TimeSeries';
 import { config } from 'app/core/config';
 
@@ -19,13 +12,12 @@ import { TimeSeriesTooltip } from './TimeSeriesTooltip';
 import { Options } from './panelcfg.gen';
 import { AnnotationEditorPlugin } from './plugins/AnnotationEditorPlugin';
 import { AnnotationsPlugin } from './plugins/AnnotationsPlugin';
-import { AnnotationsPlugin2 } from './plugins/AnnotationsPlugin2';
 import { ContextMenuPlugin } from './plugins/ContextMenuPlugin';
 import { ExemplarsPlugin, getVisibleLabels } from './plugins/ExemplarsPlugin';
 import { OutsideRangePlugin } from './plugins/OutsideRangePlugin';
 import { ThresholdControlsPlugin } from './plugins/ThresholdControlsPlugin';
 import { getPrepareTimeseriesSuggestion } from './suggestions';
-import { getTimezones, isTooltipScrollable, prepareGraphableFields } from './utils';
+import { getTimezones, prepareGraphableFields, regenerateLinksSupplier } from './utils';
 
 interface TimeSeriesPanelProps extends PanelProps<Options> {}
 
@@ -41,18 +33,9 @@ export const TimeSeriesPanel = ({
   replaceVariables,
   id,
 }: TimeSeriesPanelProps) => {
-  const {
-    sync,
-    canAddAnnotations,
-    onThresholdsChange,
-    canEditThresholds,
-    showThresholds,
-    dataLinkPostProcessor,
-    eventBus,
-  } = usePanelContext();
-  // Vertical orientation is not available for users through config.
-  // It is simplified version of horizontal time series panel and it does not support all plugins.
-  const isVerticallyOriented = options.orientation === VizOrientation.Vertical;
+  const { sync, canAddAnnotations, onThresholdsChange, canEditThresholds, showThresholds, dataLinkPostProcessor } =
+    usePanelContext();
+
   const frames = useMemo(() => prepareGraphableFields(data.series, config.theme2, timeRange), [data.series, timeRange]);
   const timezones = useMemo(() => getTimezones(options.timezone, timeZone), [options.timezone, timeZone]);
   const suggestions = useMemo(() => {
@@ -65,24 +48,6 @@ export const TimeSeriesPanel = ({
     }
     return undefined;
   }, [frames, id]);
-
-  const enableAnnotationCreation = Boolean(canAddAnnotations && canAddAnnotations());
-  const showNewVizTooltips = Boolean(config.featureToggles.newVizTooltips);
-  // temp range set for adding new annotation set by TooltipPlugin2, consumed by AnnotationPlugin2
-  const [newAnnotationRange, setNewAnnotationRange] = useState<TimeRange2 | null>(null);
-
-  // TODO: we should just re-init when this changes, and have this be a static setting
-  const syncTooltip = useCallback(
-    () => sync?.() === DashboardCursorSync.Tooltip,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
-
-  const syncAny = useCallback(
-    () => sync?.() !== DashboardCursorSync.Off,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
-  );
 
   if (!frames || suggestions) {
     return (
@@ -98,13 +63,7 @@ export const TimeSeriesPanel = ({
     );
   }
 
-  // which annotation are we editing?
-  // are we adding a new annotation? is annotating?
-  // console.log(data.annotations);
-
-  // annotations plugin includes the editor and the renderer
-  // its annotation state is managed here for now
-  // tooltipplugin2 receives render with annotate range, callback should setstate here that gets passed to annotationsplugin as newAnnotaton or editAnnotation
+  const enableAnnotationCreation = Boolean(canAddAnnotations && canAddAnnotations());
 
   return (
     <TimeSeries
@@ -116,17 +75,24 @@ export const TimeSeriesPanel = ({
       height={height}
       legend={options.legend}
       options={options}
-      replaceVariables={replaceVariables}
-      dataLinkPostProcessor={dataLinkPostProcessor}
     >
-      {(uplotConfig, alignedFrame) => {
+      {(uplotConfig, alignedDataFrame) => {
+        if (alignedDataFrame.fields.some((f) => Boolean(f.config.links?.length))) {
+          alignedDataFrame = regenerateLinksSupplier(
+            alignedDataFrame,
+            frames,
+            replaceVariables,
+            timeZone,
+            dataLinkPostProcessor
+          );
+        }
+
         return (
           <>
             <KeyboardPlugin config={uplotConfig} />
-            <EventBusPlugin config={uplotConfig} sync={syncAny} eventBus={eventBus} frame={alignedFrame} />
             {options.tooltip.mode === TooltipDisplayMode.None || (
               <>
-                {showNewVizTooltips ? (
+                {config.featureToggles.newVizTooltips ? (
                   <TooltipPlugin2
                     config={uplotConfig}
                     hoverMode={
@@ -134,45 +100,26 @@ export const TimeSeriesPanel = ({
                     }
                     queryZoom={onChangeTimeRange}
                     clientZoom={true}
-                    syncTooltip={syncTooltip}
-                    render={(u, dataIdxs, seriesIdx, isPinned = false, dismiss, timeRange2, viaSync) => {
-                      if (enableAnnotationCreation && timeRange2 != null) {
-                        setNewAnnotationRange(timeRange2);
-                        dismiss();
-                        return;
-                      }
-
-                      const annotate = () => {
-                        let xVal = u.posToVal(u.cursor.left!, 'x');
-
-                        setNewAnnotationRange({ from: xVal, to: xVal });
-                        dismiss();
-                      };
-
+                    render={(u, dataIdxs, seriesIdx, isPinned = false) => {
                       return (
-                        // not sure it header time here works for annotations, since it's taken from nearest datapoint index
                         <TimeSeriesTooltip
                           frames={frames}
-                          seriesFrame={alignedFrame}
+                          seriesFrame={alignedDataFrame}
                           dataIdxs={dataIdxs}
                           seriesIdx={seriesIdx}
-                          mode={viaSync ? TooltipDisplayMode.Multi : options.tooltip.mode}
+                          mode={options.tooltip.mode}
                           sortOrder={options.tooltip.sort}
                           isPinned={isPinned}
-                          annotate={enableAnnotationCreation ? annotate : undefined}
-                          scrollable={isTooltipScrollable(options.tooltip)}
                         />
                       );
                     }}
-                    maxWidth={options.tooltip.maxWidth}
-                    maxHeight={options.tooltip.maxHeight}
                   />
                 ) : (
                   <>
                     <ZoomPlugin config={uplotConfig} onZoom={onChangeTimeRange} withZoomY={true} />
                     <TooltipPlugin
                       frames={frames}
-                      data={alignedFrame}
+                      data={alignedDataFrame}
                       config={uplotConfig}
                       mode={options.tooltip.mode}
                       sortOrder={options.tooltip.sort}
@@ -184,29 +131,17 @@ export const TimeSeriesPanel = ({
               </>
             )}
             {/* Renders annotation markers*/}
-            {!isVerticallyOriented && showNewVizTooltips ? (
-              <AnnotationsPlugin2
-                annotations={data.annotations ?? []}
-                config={uplotConfig}
-                timeZone={timeZone}
-                newRange={newAnnotationRange}
-                setNewRange={setNewAnnotationRange}
-              />
-            ) : (
-              !isVerticallyOriented &&
-              data.annotations && (
-                <AnnotationsPlugin annotations={data.annotations} config={uplotConfig} timeZone={timeZone} />
-              )
+            {data.annotations && (
+              <AnnotationsPlugin annotations={data.annotations} config={uplotConfig} timeZone={timeZone} />
             )}
-
             {/*Enables annotations creation*/}
-            {!showNewVizTooltips ? (
-              enableAnnotationCreation && !isVerticallyOriented ? (
-                <AnnotationEditorPlugin data={alignedFrame} timeZone={timeZone} config={uplotConfig}>
+            {!config.featureToggles.newVizTooltips ? (
+              enableAnnotationCreation ? (
+                <AnnotationEditorPlugin data={alignedDataFrame} timeZone={timeZone} config={uplotConfig}>
                   {({ startAnnotating }) => {
                     return (
                       <ContextMenuPlugin
-                        data={alignedFrame}
+                        data={alignedDataFrame}
                         config={uplotConfig}
                         timeZone={timeZone}
                         replaceVariables={replaceVariables}
@@ -233,7 +168,7 @@ export const TimeSeriesPanel = ({
                 </AnnotationEditorPlugin>
               ) : (
                 <ContextMenuPlugin
-                  data={alignedFrame}
+                  data={alignedDataFrame}
                   frames={frames}
                   config={uplotConfig}
                   timeZone={timeZone}
@@ -242,7 +177,7 @@ export const TimeSeriesPanel = ({
                 />
               )
             ) : undefined}
-            {data.annotations && !isVerticallyOriented && (
+            {data.annotations && (
               <ExemplarsPlugin
                 visibleSeries={getVisibleLabels(uplotConfig, frames)}
                 config={uplotConfig}
@@ -251,7 +186,7 @@ export const TimeSeriesPanel = ({
               />
             )}
 
-            {((canEditThresholds && onThresholdsChange) || showThresholds) && !isVerticallyOriented && (
+            {((canEditThresholds && onThresholdsChange) || showThresholds) && (
               <ThresholdControlsPlugin
                 config={uplotConfig}
                 fieldConfig={fieldConfig}

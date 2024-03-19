@@ -1,6 +1,9 @@
-import { DashboardLoadedEvent, DataQueryRequest, dateTime } from '@grafana/data';
-import { QueryEditorMode } from '@grafana/experimental';
+import { getQueryOptions } from 'test/helpers/getQueryOptions';
+
+import { DashboardLoadedEvent, dateTime } from '@grafana/data';
 import { reportInteraction } from '@grafana/runtime';
+
+import { QueryEditorMode } from '../prometheus/querybuilder/shared/types';
 
 import pluginJson from './plugin.json';
 import { partitionTimeRange } from './querySplitting';
@@ -24,7 +27,7 @@ const range = {
     to: dateTime('2023-02-10T06:00:00.000Z'),
   },
 };
-const originalRequest = {
+const originalRequest = getQueryOptions<LokiQuery>({
   targets: [
     { expr: 'count_over_time({a="b"}[1m])', refId: 'A', ...baseTarget },
     { expr: '{a="b"}', refId: 'B', maxLines: 10, ...baseTarget },
@@ -32,23 +35,26 @@ const originalRequest = {
   ],
   range,
   app: 'explore',
-} as DataQueryRequest<LokiQuery>;
-
+});
 const requests: LokiGroupedRequest[] = [
   {
     request: {
-      targets: [{ expr: 'count_over_time({a="b"}[1m])', refId: 'A', ...baseTarget }],
-      range,
+      ...getQueryOptions<LokiQuery>({
+        targets: [{ expr: 'count_over_time({a="b"}[1m])', refId: 'A', ...baseTarget }],
+        range,
+      }),
       app: 'explore',
-    } as DataQueryRequest<LokiQuery>,
+    },
     partition: partitionTimeRange(true, range, 60000, 24 * 60 * 60 * 1000),
   },
   {
     request: {
-      targets: [{ expr: '{a="b"}', refId: 'B', maxLines: 10, ...baseTarget }],
-      range,
+      ...getQueryOptions<LokiQuery>({
+        targets: [{ expr: '{a="b"}', refId: 'B', maxLines: 10, ...baseTarget }],
+        range,
+      }),
       app: 'explore',
-    } as DataQueryRequest<LokiQuery>,
+    },
     partition: partitionTimeRange(false, range, 60000, 24 * 60 * 60 * 1000),
   },
 ];
@@ -78,6 +84,8 @@ test('Tracks queries', () => {
     legend: undefined,
     line_limit: undefined,
     obfuscated_query: 'count_over_time({Identifier=String}[1m])',
+    parsed_query:
+      'LogQL,Expr,MetricExpr,RangeAggregationExpr,RangeOp,CountOverTime,LogRangeExpr,Selector,Matchers,Matcher,Identifier,Eq,String,Range,Duration',
     query_type: 'metric',
     query_vector_type: undefined,
     resolution: 1,
@@ -104,6 +112,8 @@ test('Tracks predefined operations', () => {
     legend: undefined,
     line_limit: undefined,
     obfuscated_query: 'count_over_time({Identifier=String}[1m])',
+    parsed_query:
+      'LogQL,Expr,MetricExpr,RangeAggregationExpr,RangeOp,CountOverTime,LogRangeExpr,Selector,Matchers,Matcher,Identifier,Eq,String,Range,Duration',
     query_type: 'metric',
     query_vector_type: undefined,
     resolution: 1,
@@ -130,6 +140,8 @@ test('Tracks grouped queries', () => {
     legend: undefined,
     line_limit: undefined,
     obfuscated_query: 'count_over_time({Identifier=String}[1m])',
+    parsed_query:
+      'LogQL,Expr,MetricExpr,RangeAggregationExpr,RangeOp,CountOverTime,LogRangeExpr,Selector,Matchers,Matcher,Identifier,Eq,String,Range,Duration',
     query_type: 'metric',
     query_vector_type: undefined,
     resolution: 1,
@@ -156,6 +168,7 @@ test('Tracks grouped queries', () => {
     legend: undefined,
     line_limit: 10,
     obfuscated_query: '{Identifier=String}',
+    parsed_query: 'LogQL,Expr,LogExpr,Selector,Matchers,Matcher,Identifier,Eq,String',
     query_type: 'logs',
     query_vector_type: undefined,
     resolution: 1,

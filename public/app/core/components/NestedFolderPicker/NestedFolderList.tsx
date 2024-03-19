@@ -6,6 +6,7 @@ import InfiniteLoader from 'react-window-infinite-loader';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { IconButton, useStyles2 } from '@grafana/ui';
+import { getSvgSize } from '@grafana/ui/src/components/Icon/utils';
 import { Text } from '@grafana/ui/src/components/Text/Text';
 import { Indent } from 'app/core/components/Indent/Indent';
 import { Trans } from 'app/core/internationalization';
@@ -190,7 +191,6 @@ function Row({ index, style: virtualStyles, data }: RowProps) {
     >
       <div className={styles.rowBody}>
         <Indent level={level} spacing={2} />
-
         {foldersAreOpenable ? (
           <IconButton
             size={CHEVRON_SIZE}
@@ -237,8 +237,9 @@ const getStyles = (theme: GrafanaTheme2) => {
       width: '100%',
     }),
 
+    // Should be the same size as the <IconButton /> for proper alignment
     folderButtonSpacer: css({
-      paddingLeft: theme.spacing(0.5),
+      paddingLeft: `calc(${getSvgSize(CHEVRON_SIZE)}px + ${theme.spacing(0.5)})`,
     }),
 
     row: css({

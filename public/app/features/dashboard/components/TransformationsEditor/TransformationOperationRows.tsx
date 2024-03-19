@@ -1,13 +1,12 @@
 import React from 'react';
 
-import { DataTransformerConfig, standardTransformersRegistry } from '@grafana/data';
+import { DataFrame, DataTransformerConfig, standardTransformersRegistry } from '@grafana/data';
 
 import { TransformationOperationRow } from './TransformationOperationRow';
-import { TransformationData } from './TransformationsEditor';
 import { TransformationsEditorTransformation } from './types';
 
 interface TransformationOperationRowsProps {
-  data: TransformationData;
+  data: DataFrame[];
   configs: TransformationsEditorTransformation[];
   onRemove: (index: number) => void;
   onChange: (index: number, config: DataTransformerConfig) => void;

@@ -10,7 +10,6 @@ import (
 	"github.com/go-openapi/strfmt"
 	"github.com/grafana/grafana/pkg/infra/log"
 	apimodels "github.com/grafana/grafana/pkg/services/ngalert/api/tooling/definitions"
-	"github.com/grafana/grafana/pkg/services/ngalert/metrics"
 	"github.com/grafana/grafana/pkg/services/ngalert/models"
 	"github.com/grafana/grafana/pkg/services/ngalert/notifier"
 	remoteClient "github.com/grafana/grafana/pkg/services/ngalert/remote/client"
@@ -27,7 +26,6 @@ type stateStore interface {
 
 type Alertmanager struct {
 	log      log.Logger
-	metrics  *metrics.RemoteAlertmanager
 	orgID    int64
 	ready    bool
 	sender   *sender.ExternalAlertmanager
@@ -61,7 +59,7 @@ func (cfg *AlertmanagerConfig) Validate() error {
 	return nil
 }
 
-func NewAlertmanager(cfg AlertmanagerConfig, store stateStore, metrics *metrics.RemoteAlertmanager) (*Alertmanager, error) {
+func NewAlertmanager(cfg AlertmanagerConfig, store stateStore) (*Alertmanager, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
@@ -78,7 +76,7 @@ func NewAlertmanager(cfg AlertmanagerConfig, store stateStore, metrics *metrics.
 		Password: cfg.BasicAuthPassword,
 		Logger:   logger,
 	}
-	mc, err := remoteClient.New(mcCfg, metrics)
+	mc, err := remoteClient.New(mcCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +87,7 @@ func NewAlertmanager(cfg AlertmanagerConfig, store stateStore, metrics *metrics.
 		Password: cfg.BasicAuthPassword,
 		Logger:   logger,
 	}
-	amc, err := remoteClient.NewAlertmanager(amcCfg, metrics)
+	amc, err := remoteClient.NewAlertmanager(amcCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -106,17 +104,13 @@ func NewAlertmanager(cfg AlertmanagerConfig, store stateStore, metrics *metrics.
 		return nil, err
 	}
 
-	// Initialize LastReadinessCheck so it's present even if the check fails.
-	metrics.LastReadinessCheck.Set(0)
-
 	return &Alertmanager{
-		amClient:    amc,
 		log:         logger,
-		metrics:     metrics,
 		mimirClient: mc,
-		orgID:       cfg.OrgID,
 		state:       store,
+		amClient:    amc,
 		sender:      s,
+		orgID:       cfg.OrgID,
 		tenantID:    cfg.TenantID,
 		url:         cfg.URL,
 	}, nil
@@ -165,7 +159,6 @@ func (am *Alertmanager) checkReadiness(ctx context.Context) error {
 
 	if ready {
 		am.log.Debug("Alertmanager readiness check successful")
-		am.metrics.LastReadinessCheck.SetToCurrentTime()
 		am.ready = true
 		return nil
 	}
@@ -177,7 +170,6 @@ func (am *Alertmanager) checkReadiness(ctx context.Context) error {
 // If not, it sends the configuration to the remote Alertmanager.
 func (am *Alertmanager) CompareAndSendConfiguration(ctx context.Context, config *models.AlertConfiguration) error {
 	if am.shouldSendConfig(ctx, config) {
-		am.metrics.ConfigSyncsTotal.Inc()
 		if err := am.mimirClient.CreateGrafanaAlertmanagerConfig(
 			ctx,
 			config.AlertmanagerConfiguration,
@@ -186,10 +178,8 @@ func (am *Alertmanager) CompareAndSendConfiguration(ctx context.Context, config 
 			config.CreatedAt,
 			config.Default,
 		); err != nil {
-			am.metrics.ConfigSyncErrorsTotal.Inc()
 			return err
 		}
-		am.metrics.LastConfigSync.SetToCurrentTime()
 	}
 	return nil
 }
@@ -203,12 +193,9 @@ func (am *Alertmanager) CompareAndSendState(ctx context.Context) error {
 	}
 
 	if am.shouldSendState(ctx, state) {
-		am.metrics.StateSyncsTotal.Inc()
 		if err := am.mimirClient.CreateGrafanaAlertmanagerState(ctx, state); err != nil {
-			am.metrics.StateSyncErrorsTotal.Inc()
 			return err
 		}
-		am.metrics.LastStateSync.SetToCurrentTime()
 	}
 	return nil
 }

@@ -17,10 +17,6 @@ function skipFiles(f: string): boolean {
     // avoid copying tsconfig.json
     return false;
   }
-  if (f.includes('/package.json')) {
-    // avoid copying package.json
-    return false;
-  }
   return true;
 }
 
@@ -32,7 +28,7 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
       buildDependencies: {
         config: [__filename],
       },
-      cacheDirectory: path.resolve(__dirname, '../../node_modules/.cache/webpack', path.basename(process.cwd())),
+      cacheDirectory: path.resolve(__dirname, '../../.yarn/.cache/webpack', path.basename(process.cwd())),
     },
 
     context: process.cwd(),
@@ -90,7 +86,7 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
             loader: require.resolve('swc-loader'),
             options: {
               jsc: {
-                baseUrl: path.resolve(__dirname),
+                baseUrl: '.',
                 target: 'es2015',
                 loose: false,
                 parser: {
@@ -144,7 +140,6 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
       },
       path: path.resolve(process.cwd(), DIST_DIR),
       publicPath: `public/plugins/${pluginJson.id}/`,
-      uniqueName: pluginJson.id,
     },
 
     plugins: [
@@ -184,6 +179,18 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
             },
           ],
         },
+        {
+          dir: path.resolve(DIST_DIR),
+          files: ['package.json'],
+          rules: [
+            {
+              search: `"version": "${getPackageJson().version}"`,
+              replace: env.commit
+                ? `"version": "${getPackageJson().version}-${env.commit}"`
+                : `"version": "${getPackageJson().version}"`,
+            },
+          ],
+        },
       ]),
       env.development
         ? new ForkTsCheckerWebpackPlugin({
@@ -200,7 +207,7 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
             lintDirtyModulesOnly: true, // don't lint on start, only lint changed files
             cacheLocation: path.resolve(
               __dirname,
-              '../../node_modules/.cache/eslint-webpack-plugin',
+              '../../.yarn/.cache/eslint-webpack-plugin',
               path.basename(process.cwd()),
               '.eslintcache'
             ),
@@ -212,8 +219,6 @@ const config = async (env: Record<string, unknown>): Promise<Configuration> => {
       extensions: ['.ts', '.tsx', '.js', '.jsx'],
       unsafeCache: true,
     },
-
-    stats: 'minimal',
 
     watchOptions: {
       ignored: ['**/node_modules', '**/dist', '**/.yarn'],

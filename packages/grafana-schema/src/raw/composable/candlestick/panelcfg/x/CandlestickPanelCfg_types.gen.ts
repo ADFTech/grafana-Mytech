@@ -4,13 +4,14 @@
 //     public/app/plugins/gen.go
 // Using jennies:
 //     TSTypesJenny
-//     PluginTsTypesJenny
+//     LatestMajorsOrXJenny
+//     PluginEachMajorJenny
 //
 // Run 'make gen-cue' from repository root to regenerate.
 
 import * as common from '@grafana/schema';
 
-export const pluginVersion = "11.0.0-pre";
+export const pluginVersion = "10.3.0-pre";
 
 export enum VizDisplayMode {
   Candles = 'candles',
@@ -63,7 +64,7 @@ export const defaultCandlestickColors: Partial<CandlestickColors> = {
   up: 'green',
 };
 
-export interface Options extends common.OptionsWithLegend, common.OptionsWithTooltip {
+export interface Options extends common.OptionsWithLegend {
   /**
    * Sets the style of the candlesticks
    */

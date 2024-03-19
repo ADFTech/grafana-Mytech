@@ -1,13 +1,9 @@
 import { SceneObjectUrlSyncHandler, SceneObjectUrlValues } from '@grafana/scenes';
 
-import { AnnotationsEditView, AnnotationsEditViewState } from './AnnotationsEditView';
 import { DashboardLinksEditView, DashboardLinksEditViewState } from './DashboardLinksEditView';
-import { VariablesEditView, VariablesEditViewState } from './VariablesEditView';
 
-type EditListViewUrlSync = DashboardLinksEditView | VariablesEditView | AnnotationsEditView;
-type EditListViewState = DashboardLinksEditViewState | VariablesEditViewState | AnnotationsEditViewState;
 export class EditListViewSceneUrlSync implements SceneObjectUrlSyncHandler {
-  constructor(private _scene: EditListViewUrlSync) {}
+  constructor(private _scene: DashboardLinksEditView) {}
 
   getKeys(): string[] {
     return ['editIndex'];
@@ -21,7 +17,7 @@ export class EditListViewSceneUrlSync implements SceneObjectUrlSyncHandler {
   }
 
   updateFromUrl(values: SceneObjectUrlValues): void {
-    let update: Partial<EditListViewState> = {};
+    let update: Partial<DashboardLinksEditViewState> = {};
     if (typeof values.editIndex === 'string') {
       update = { editIndex: Number(values.editIndex) };
     } else {

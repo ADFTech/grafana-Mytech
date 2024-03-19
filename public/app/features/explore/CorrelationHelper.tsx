@@ -84,10 +84,10 @@ export const CorrelationHelper = ({ exploreId, correlations }: Props) => {
   useEffect(() => {
     const subscription = watch((value) => {
       let dirty = correlationDetails?.correlationDirty || false;
-      let description = value.description || '';
-      if (!dirty && (value.label !== defaultLabel || description !== '')) {
+
+      if (!dirty && (value.label !== defaultLabel || value.description !== '')) {
         dirty = true;
-      } else if (dirty && value.label === defaultLabel && description.trim() === '') {
+      } else if (dirty && value.label === defaultLabel && value.description.trim() === '') {
         dirty = false;
       }
       dispatch(

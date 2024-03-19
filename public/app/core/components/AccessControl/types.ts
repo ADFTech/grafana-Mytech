@@ -13,7 +13,6 @@ export type ResourcePermission = {
   builtInRole?: string;
   actions: string[];
   permission: string;
-  warning?: string;
 };
 
 export type SetPermission = {

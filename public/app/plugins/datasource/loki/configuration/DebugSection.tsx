@@ -1,8 +1,9 @@
 import React, { ReactNode, useState } from 'react';
 
-import { getTemplateSrv } from '@grafana/runtime';
+import { Field, FieldType, LinkModel } from '@grafana/data';
 import { InlineField, TextArea } from '@grafana/ui';
 
+import { getFieldLinksForExplore } from '../../../../features/explore/utils/links';
 import { DerivedFieldConfig } from '../types';
 
 type Props = {
@@ -23,7 +24,7 @@ export const DebugSection = (props: Props) => {
       <InlineField label="Debug log message" labelWidth={24} grow>
         <TextArea
           type="text"
-          aria-label="Loki query"
+          aria-label="Prometheus Query"
           placeholder="Paste an example log line here to test the regular expressions of your derived fields"
           value={debugText}
           onChange={(event) => setDebugText(event.currentTarget.value)}
@@ -81,30 +82,36 @@ function makeDebugFields(derivedFields: DerivedFieldConfig[], debugText: string)
     .map((field) => {
       try {
         const testMatch = debugText.match(field.matcherRegex);
-        let href;
         const value = testMatch && testMatch[1];
+        let link: LinkModel<Field> | null = null;
 
-        if (value) {
-          href = getTemplateSrv().replace(field.url, {
-            __value: {
-              value: {
-                raw: value,
+        if (field.url && value) {
+          link = getFieldLinksForExplore({
+            field: {
+              name: '',
+              type: FieldType.string,
+              values: [value],
+              config: {
+                links: [{ title: '', url: field.url }],
               },
-              text: 'Raw value',
             },
-          });
+            rowIndex: 0,
+            range: {} as any,
+          })[0];
         }
-        const debugFiled: DebugField = {
+
+        const result: DebugField = {
           name: field.name,
           value: value || '<no match>',
-          href,
+          href: link ? link.href : undefined,
         };
-        return debugFiled;
+        return result;
       } catch (error) {
-        return {
+        const result: DebugField = {
           name: field.name,
           error,
         };
+        return result;
       }
     });
 }

@@ -111,7 +111,9 @@ export class AppPlugin<T extends KeyValue = KeyValue> extends GrafanaPlugin<AppP
     return this;
   }
 
-  configureExtensionComponent<Props = {}>(extension: Omit<PluginExtensionComponentConfig<Props>, 'type'>) {
+  configureExtensionComponent<Context extends object>(
+    extension: Omit<PluginExtensionComponentConfig<Context>, 'type'>
+  ) {
     this._extensionConfigs.push({
       ...extension,
       type: PluginExtensionTypes.component,

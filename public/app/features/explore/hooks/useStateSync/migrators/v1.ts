@@ -1,5 +1,5 @@
 import { ExploreUrlState } from '@grafana/data';
-import { ID_ALPHABET, generateExploreId } from 'app/core/utils/explore';
+import { generateExploreId } from 'app/core/utils/explore';
 import { DEFAULT_RANGE } from 'app/features/explore/state/utils';
 
 import { hasKey } from '../../utils';
@@ -48,21 +48,9 @@ export const v1Migrator: MigrationHandler<ExploreURLV0, ExploreURLV1> = {
     const panes = Object.entries(rawPanes)
       .map(([key, value]) => [key, applyDefaults(value)] as const)
       .reduce<Record<string, ExploreUrlState>>((acc, [key, value]) => {
-        let newKey = key;
-        // Panes IDs must be 3 characters long and contain at least one letter
-        if (
-          newKey.length !== 3 ||
-          /^\d+$/.test(newKey) ||
-          newKey.split('').some((ch) => {
-            return ID_ALPHABET.indexOf(ch) === -1;
-          })
-        ) {
-          newKey = generateExploreId();
-        }
-
         return {
           ...acc,
-          [newKey]: value,
+          [key]: value,
         };
       }, {});
 

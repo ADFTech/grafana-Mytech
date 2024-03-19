@@ -1,9 +1,7 @@
-import { IScope, IAngularStatic } from 'angular';
 import $ from 'jquery';
 import { defaults } from 'lodash';
 
 import { isTableData, PanelEvents, PanelPlugin } from '@grafana/data';
-import { AnnotationsSrv } from 'app/angular/services/annotations_srv';
 import config from 'app/core/config';
 import { applyFilterFromTable } from 'app/features/variables/adhoc/actions';
 import { MetricsPanelCtrl } from 'app/plugins/sdk';
@@ -58,9 +56,9 @@ export class TablePanelCtrl extends MetricsPanelCtrl {
   static $inject = ['$scope', '$injector', 'annotationsSrv', '$sanitize'];
 
   constructor(
-    $scope: IScope,
-    $injector: IAngularStatic['injector'],
-    private annotationsSrv: AnnotationsSrv,
+    $scope: any,
+    $injector: any,
+    private annotationsSrv: any,
     private $sanitize: any
   ) {
     super($scope, $injector);
@@ -103,11 +101,12 @@ export class TablePanelCtrl extends MetricsPanelCtrl {
           panel: this.panel,
           range: this.range,
         })
-        .then((anno) => {
+        .then((anno: any) => {
           this.loading = false;
           this.dataRaw = anno;
           this.pageIndex = 0;
           this.render();
+          return { data: this.dataRaw }; // Not used
         });
     }
 
@@ -171,7 +170,7 @@ export class TablePanelCtrl extends MetricsPanelCtrl {
     this.render();
   }
 
-  link(scope: IScope, elem: JQuery, attrs: any, ctrl: TablePanelCtrl) {
+  link(scope: any, elem: JQuery, attrs: any, ctrl: TablePanelCtrl) {
     let data: any;
     const panel = ctrl.panel;
     let pageCount = 0;
@@ -192,7 +191,7 @@ export class TablePanelCtrl extends MetricsPanelCtrl {
       tbodyElem.html(ctrl.renderer.render(ctrl.pageIndex));
     }
 
-    function switchPage(e: JQueryEventObject) {
+    function switchPage(e: any) {
       const el = $(e.currentTarget);
       ctrl.pageIndex = parseInt(el.text(), 10) - 1;
       renderPanel();
@@ -264,7 +263,7 @@ export class TablePanelCtrl extends MetricsPanelCtrl {
       unbindDestroy();
     });
 
-    ctrl.events.on(PanelEvents.render, (renderData: unknown) => {
+    ctrl.events.on(PanelEvents.render, (renderData: any) => {
       data = renderData || data;
       if (data) {
         renderPanel();

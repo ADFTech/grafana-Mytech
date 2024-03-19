@@ -46,7 +46,8 @@ export interface SystemConfigOverrideRule extends ConfigOverrideRule {
  */
 export function isSystemOverrideWithRef<T extends SystemConfigOverrideRule>(ref: string) {
   return (override: ConfigOverrideRule): override is T => {
-    return '__systemRef' in override && override.__systemRef === ref;
+    const overrideAs = override as T;
+    return overrideAs.__systemRef === ref;
   };
 }
 
@@ -57,7 +58,7 @@ export function isSystemOverrideWithRef<T extends SystemConfigOverrideRule>(ref:
  * @internal
  */
 export const isSystemOverride = (override: ConfigOverrideRule): override is SystemConfigOverrideRule => {
-  return '__systemRef' in override && typeof override.__systemRef === 'string';
+  return typeof (override as SystemConfigOverrideRule)?.__systemRef === 'string';
 };
 
 export interface FieldConfigSource<TOptions = any> {
@@ -68,7 +69,7 @@ export interface FieldConfigSource<TOptions = any> {
   overrides: ConfigOverrideRule[];
 }
 
-export interface FieldOverrideContext extends StandardEditorContext<any> {
+export interface FieldOverrideContext extends StandardEditorContext<any, any> {
   field?: Field;
   dataFrameIndex?: number; // The index for the selected field frame
 }

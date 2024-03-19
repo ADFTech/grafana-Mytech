@@ -2,8 +2,9 @@ import { css } from '@emotion/css';
 import React from 'react';
 
 import { DataSourcePluginOptionsEditorProps, GrafanaTheme2, updateDatasourcePluginJsonDataOption } from '@grafana/data';
-import { IntervalInput, invalidTimeShiftError } from '@grafana/o11y-ds-frontend';
 import { InlineField, InlineSwitch, useStyles2 } from '@grafana/ui';
+import { IntervalInput } from 'app/core/components/IntervalInput/IntervalInput';
+import { invalidTimeShiftError } from 'app/core/components/TraceToLogs/TraceToLogsSettings';
 
 import { TempoJsonData } from '../types';
 
@@ -71,14 +72,14 @@ export function QuerySettings({ options, onOptionsChange }: Props) {
 }
 
 export const getStyles = (theme: GrafanaTheme2) => ({
-  infoText: css({
-    paddingBottom: theme.spacing(2),
-    color: theme.colors.text.secondary,
-  }),
-  container: css({
-    width: '100%',
-  }),
-  row: css({
-    alignItems: 'baseline',
-  }),
+  infoText: css`
+    padding-bottom: ${theme.spacing(2)};
+    color: ${theme.colors.text.secondary};
+  `,
+  container: css`
+    width: 100%;
+  `,
+  row: css`
+    align-items: baseline;
+  `,
 });

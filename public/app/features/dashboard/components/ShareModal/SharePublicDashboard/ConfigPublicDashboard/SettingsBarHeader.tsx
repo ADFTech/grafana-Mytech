@@ -3,7 +3,6 @@ import React from 'react';
 
 import { GrafanaTheme2 } from '@grafana/data';
 import { IconButton, ReactUtils, useStyles2 } from '@grafana/ui';
-import { t } from 'app/core/internationalization';
 
 export interface Props {
   onRowToggle: () => void;
@@ -23,11 +22,7 @@ export function SettingsBarHeader({ headerElement, isContentVisible = false, onR
       <div className={styles.header}>
         <IconButton
           name={isContentVisible ? 'angle-down' : 'angle-right'}
-          tooltip={
-            isContentVisible
-              ? t('public-dashboard.settings-bar-header.collapse-settings-tooltip', 'Collapse settings')
-              : t('public-dashboard.settings-bar-header.expand-settings-tooltip', 'Expand settings')
-          }
+          tooltip={isContentVisible ? 'Collapse settings' : 'Expand settings'}
           className={styles.collapseIcon}
           onClick={onRowToggle}
           aria-expanded={isContentVisible}

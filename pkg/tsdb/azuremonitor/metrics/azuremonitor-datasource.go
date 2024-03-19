@@ -14,12 +14,12 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/grafana/grafana/pkg/services/featuremgmt"
 	"github.com/grafana/grafana/pkg/tsdb/azuremonitor/kinds/dataquery"
 	"github.com/grafana/grafana/pkg/tsdb/azuremonitor/loganalytics"
 	azTime "github.com/grafana/grafana/pkg/tsdb/azuremonitor/time"
@@ -28,8 +28,8 @@ import (
 
 // AzureMonitorDatasource calls the Azure Monitor API - one of the four API's supported
 type AzureMonitorDatasource struct {
-	Proxy  types.ServiceProxy
-	Logger log.Logger
+	Proxy    types.ServiceProxy
+	Features featuremgmt.FeatureToggles
 }
 
 var (
@@ -278,7 +278,7 @@ func (e *AzureMonitorDatasource) retrieveSubscriptionDetails(cli *http.Client, c
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			e.Logger.Warn("Failed to close response body", "err", err)
+			backend.Logger.Warn("Failed to close response body", "err", err)
 		}
 	}()
 
@@ -330,11 +330,16 @@ func (e *AzureMonitorDatasource) executeQuery(ctx context.Context, query *types.
 
 	defer func() {
 		if err := res.Body.Close(); err != nil {
-			e.Logger.Warn("Failed to close response body", "err", err)
+			backend.Logger.Warn("Failed to close response body", "err", err)
 		}
 	}()
 
 	data, err := e.unmarshalResponse(res)
+	if err != nil {
+		return nil, err
+	}
+
+	azurePortalUrl, err := loganalytics.GetAzurePortalUrl(dsInfo.Cloud)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +349,7 @@ func (e *AzureMonitorDatasource) executeQuery(ctx context.Context, query *types.
 		return nil, err
 	}
 
-	frames, err := e.parseResponse(data, query, dsInfo.Routes["Azure Portal"].URL, subscription)
+	frames, err := e.parseResponse(data, query, azurePortalUrl, subscription)
 	if err != nil {
 		return nil, err
 	}

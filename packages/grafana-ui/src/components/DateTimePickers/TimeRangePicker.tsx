@@ -39,7 +39,6 @@ export interface TimeRangePickerProps {
   onMoveBackward: () => void;
   onMoveForward: () => void;
   onZoom: () => void;
-  onError?: (error?: string) => void;
   history?: TimeRange[];
   hideQuickRanges?: boolean;
   widthOverride?: number;
@@ -59,7 +58,6 @@ export function TimeRangePicker(props: TimeRangePickerProps) {
     onMoveBackward,
     onMoveForward,
     onZoom,
-    onError,
     timeZone,
     fiscalYearStartMonth,
     timeSyncButton,
@@ -153,7 +151,7 @@ export function TimeRangePicker(props: TimeRangePickerProps) {
       {isOpen && (
         <div data-testid={selectors.components.TimePicker.overlayContent}>
           <div role="presentation" className={cx(modalBackdrop, styles.backdrop)} {...underlayProps} />
-          <FocusScope contain autoFocus restoreFocus>
+          <FocusScope contain autoFocus>
             <section className={styles.content} ref={overlayRef} {...overlayProps} {...dialogProps}>
               <TimePickerContent
                 timeZone={timeZone}
@@ -167,7 +165,6 @@ export function TimeRangePicker(props: TimeRangePickerProps) {
                 onChangeTimeZone={onChangeTimeZone}
                 onChangeFiscalYearStartMonth={onChangeFiscalYearStartMonth}
                 hideQuickRanges={hideQuickRanges}
-                onError={onError}
               />
             </section>
           </FocusScope>

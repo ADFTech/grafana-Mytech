@@ -1,29 +1,5 @@
 import { VariableOption, UserProps, OrgProps, DashboardProps, ScopedVars } from '@grafana/data';
-import { TemplateSrv } from '@grafana/runtime';
-
-/*
- * This regex matches 3 types of variable reference with an optional format specifier
- * There are 6 capture groups that replace will return
- * \$(\w+)                                    $var1
- * \[\[(\w+?)(?::(\w+))?\]\]                  [[var2]] or [[var2:fmt2]]
- * \${(\w+)(?:\.([^:^\}]+))?(?::([^\}]+))?}   ${var3} or ${var3.fieldPath} or ${var3:fmt3} (or ${var3.fieldPath:fmt3} but that is not a separate capture group)
- */
-const variableRegex = /\$(\w+)|\[\[(\w+?)(?::(\w+))?\]\]|\${(\w+)(?:\.([^:^\}]+))?(?::([^\}]+))?}/g;
-
-// Helper function since lastIndex is not reset
-const variableRegexExec = (variableString: string) => {
-  variableRegex.lastIndex = 0;
-  return variableRegex.exec(variableString);
-};
-
-export const getVariableName = (expression: string) => {
-  const match = variableRegexExec(expression);
-  if (!match) {
-    return null;
-  }
-  const variableName = match.slice(1).find((match) => match !== undefined);
-  return variableName;
-};
+import { TemplateSrv } from 'app/features/templating/template_srv';
 
 /**
  * @remarks
@@ -46,7 +22,7 @@ export const interpolateStringArrayUsingSingleOrMultiValuedVariable = (
   const format = key === 'value' ? 'pipe' : 'text';
   let result: string[] = [];
   for (const string of strings) {
-    const variableName = getVariableName(string);
+    const variableName = templateSrv.getVariableName(string);
     const valueVar = templateSrv.getVariables().find(({ name }) => name === variableName);
 
     if (valueVar && 'current' in valueVar && isVariableOption(valueVar.current)) {
@@ -67,7 +43,7 @@ export const interpolateStringArrayUsingSingleOrMultiValuedVariable = (
 };
 
 export const isTemplateVariable = (templateSrv: TemplateSrv, string: string) => {
-  const variableName = getVariableName(string);
+  const variableName = templateSrv.getVariableName(string);
   return templateSrv.getVariables().some(({ name }) => name === variableName);
 };
 

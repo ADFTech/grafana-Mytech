@@ -1,34 +1,27 @@
 import React from 'react';
 
-import { CoreApp, DataSourceApi, DataSourceInstanceSettings, IconName } from '@grafana/data';
-import { selectors } from '@grafana/e2e-selectors';
-import { config } from '@grafana/runtime';
-import { SceneObjectBase, SceneComponentProps, sceneGraph, SceneQueryRunner } from '@grafana/scenes';
+import { DataSourceApi, DataSourceInstanceSettings, IconName } from '@grafana/data';
+import { SceneObjectBase, SceneComponentProps, SceneQueryRunner, sceneGraph } from '@grafana/scenes';
 import { DataQuery } from '@grafana/schema';
-import { Button, HorizontalGroup, Tab } from '@grafana/ui';
-import { addQuery } from 'app/core/utils/query';
-import { dataSource as expressionDatasource } from 'app/features/expressions/ExpressionDatasource';
-import { GroupActionComponents } from 'app/features/query/components/QueryActionComponent';
 import { QueryEditorRows } from 'app/features/query/components/QueryEditorRows';
 import { QueryGroupTopSection } from 'app/features/query/components/QueryGroup';
-import { isSharedDashboardQuery } from 'app/plugins/datasource/dashboard';
 import { GrafanaQuery } from 'app/plugins/datasource/grafana/types';
 import { QueryGroupOptions } from 'app/types';
 
 import { PanelTimeRange } from '../../scene/PanelTimeRange';
+import { ShareQueryDataProvider } from '../../scene/ShareQueryDataProvider';
 import { VizPanelManager } from '../VizPanelManager';
 
-import { PanelDataPaneTabState, PanelDataPaneTab, TabId, PanelDataTabHeaderProps } from './types';
+import { PanelDataPaneTabState, PanelDataPaneTab } from './types';
 
 interface PanelDataQueriesTabState extends PanelDataPaneTabState {
+  // dataRef: SceneObjectRef<SceneQueryRunner | ShareQueryDataProvider>;
   datasource?: DataSourceApi;
   dsSettings?: DataSourceInstanceSettings;
 }
 export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabState> implements PanelDataPaneTab {
   static Component = PanelDataQueriesTabRendered;
-  TabComponent: (props: PanelDataTabHeaderProps) => React.JSX.Element;
-
-  tabId = TabId.Queries;
+  tabId = 'queries';
   icon: IconName = 'database';
   private _panelManager: VizPanelManager;
 
@@ -37,14 +30,21 @@ export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabStat
   }
 
   getItemsCount() {
-    return this.getQueries().length;
+    const dataObj = this._panelManager.state.panel.state.$data!;
+
+    if (dataObj instanceof ShareQueryDataProvider) {
+      return 1;
+    }
+
+    if (dataObj instanceof SceneQueryRunner) {
+      return dataObj.state.queries.length;
+    }
+
+    return null;
   }
 
   constructor(panelManager: VizPanelManager) {
     super({});
-    this.TabComponent = (props: PanelDataTabHeaderProps) => {
-      return QueriesTab({ ...props, model: this });
-    };
 
     this._panelManager = panelManager;
   }
@@ -52,7 +52,9 @@ export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabStat
   buildQueryOptions(): QueryGroupOptions {
     const panelManager = this._panelManager;
     const panelObj = this._panelManager.state.panel;
+    const dataObj = panelObj.state.$data!;
     const queryRunner = this._panelManager.queryRunner;
+
     const timeRangeObj = sceneGraph.getTimeRange(panelObj);
 
     let timeRangeOpts: QueryGroupOptions['timeRange'] = {
@@ -69,15 +71,19 @@ export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabStat
       };
     }
 
-    let queries: QueryGroupOptions['queries'] = queryRunner.state.queries;
+    let queries: QueryGroupOptions['queries'] = [];
+    if (dataObj instanceof ShareQueryDataProvider) {
+      queries = [dataObj.state.query];
+    }
+
+    if (dataObj instanceof SceneQueryRunner) {
+      queries = dataObj.state.queries;
+    }
 
     return {
-      cacheTimeout: panelManager.state.dsSettings?.meta.queryOptions?.cacheTimeout
-        ? queryRunner.state.cacheTimeout
-        : undefined,
-      queryCachingTTL: panelManager.state.dsSettings?.cachingConfig?.enabled
-        ? queryRunner.state.queryCachingTTL
-        : undefined,
+      // TODO
+      // cacheTimeout: dsSettings?.meta.queryOptions?.cacheTimeout ? panel.cacheTimeout : undefined,
+      // queryCachingTTL: dsSettings?.cachingConfig?.enabled ? panel.queryCachingTTL : undefined,
       dataSource: {
         default: panelManager.state.dsSettings?.isDefault,
         type: panelManager.state.dsSettings?.type,
@@ -109,59 +115,13 @@ export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabStat
     this._panelManager.changeQueries(queries);
   };
 
-  onRunQueries = () => {
-    this._panelManager.queryRunner.runQueries();
-  };
-
   getQueries() {
+    const dataObj = this._panelManager.state.panel.state.$data!;
+
+    if (dataObj instanceof ShareQueryDataProvider) {
+      return [dataObj.state.query];
+    }
     return this._panelManager.queryRunner.state.queries;
-  }
-
-  newQuery(): Partial<DataQuery> {
-    const { dsSettings, datasource } = this._panelManager.state;
-
-    const ds = !dsSettings?.meta.mixed ? dsSettings : datasource;
-
-    return {
-      ...datasource?.getDefaultQuery?.(CoreApp.PanelEditor),
-      datasource: { uid: ds?.uid, type: ds?.type },
-    };
-  }
-
-  addQueryClick = () => {
-    const queries = this.getQueries();
-    this.onQueriesChange(addQuery(queries, this.newQuery()));
-  };
-
-  onAddQuery = (query: Partial<DataQuery>) => {
-    const queries = this.getQueries();
-    const dsSettings = this._panelManager.state.dsSettings;
-    this.onQueriesChange(addQuery(queries, query, { type: dsSettings?.type, uid: dsSettings?.uid }));
-  };
-
-  isExpressionsSupported(dsSettings: DataSourceInstanceSettings): boolean {
-    return (dsSettings.meta.alerting || dsSettings.meta.mixed) === true;
-  }
-
-  onAddExpressionClick = () => {
-    const queries = this.getQueries();
-    this.onQueriesChange(addQuery(queries, expressionDatasource.newQuery()));
-  };
-
-  renderExtraActions() {
-    return GroupActionComponents.getAllExtraRenderAction()
-      .map((action, index) =>
-        action({
-          onAddQuery: this.onAddQuery,
-          onChangeDataSource: this.onChangeDataSource,
-          key: index,
-        })
-      )
-      .filter(Boolean);
-  }
-
-  get queryRunner(): SceneQueryRunner {
-    return this._panelManager.queryRunner;
   }
 
   get panelManager() {
@@ -170,14 +130,18 @@ export class PanelDataQueriesTab extends SceneObjectBase<PanelDataQueriesTabStat
 }
 
 function PanelDataQueriesTabRendered({ model }: SceneComponentProps<PanelDataQueriesTab>) {
-  const { datasource, dsSettings } = model.panelManager.useState();
-  const { data } = model.panelManager.queryRunner.useState();
+  const { panel, datasource, dsSettings } = model.panelManager.useState();
+  const { $data: dataObj } = panel.useState();
+
+  if (!dataObj) {
+    return;
+  }
+
+  const { data } = dataObj!.useState();
 
   if (!datasource || !dsSettings || !data) {
     return null;
   }
-
-  const showAddButton = !isSharedDashboardQuery(dsSettings.name);
 
   return (
     <>
@@ -191,59 +155,18 @@ function PanelDataQueriesTabRendered({ model }: SceneComponentProps<PanelDataQue
         onOpenQueryInspector={model.onOpenInspector}
       />
 
-      <QueryEditorRows
-        data={data}
-        queries={model.getQueries()}
-        dsSettings={dsSettings}
-        onAddQuery={model.onAddQuery}
-        onQueriesChange={model.onQueriesChange}
-        onRunQueries={model.onRunQueries}
-      />
-
-      <HorizontalGroup spacing="md" align="flex-start">
-        {showAddButton && (
-          <Button
-            icon="plus"
-            onClick={model.addQueryClick}
-            variant="secondary"
-            data-testid={selectors.components.QueryTab.addQuery}
-          >
-            Add query
-          </Button>
-        )}
-        {config.expressionsEnabled && model.isExpressionsSupported(dsSettings) && (
-          <Button
-            icon="plus"
-            onClick={model.onAddExpressionClick}
-            variant="secondary"
-            data-testid="query-tab-add-expression"
-          >
-            <span>Expression&nbsp;</span>
-          </Button>
-        )}
-        {model.renderExtraActions()}
-      </HorizontalGroup>
+      {dataObj instanceof ShareQueryDataProvider ? (
+        <h1>TODO: DashboardQueryEditor</h1>
+      ) : (
+        <QueryEditorRows
+          data={data}
+          queries={model.getQueries()}
+          dsSettings={dsSettings}
+          onAddQuery={() => {}}
+          onQueriesChange={model.onQueriesChange}
+          onRunQueries={() => {}}
+        />
+      )}
     </>
-  );
-}
-
-interface QueriesTabProps extends PanelDataTabHeaderProps {
-  model: PanelDataQueriesTab;
-}
-
-function QueriesTab(props: QueriesTabProps) {
-  const { model } = props;
-
-  const queryRunnerState = model.queryRunner.useState();
-
-  return (
-    <Tab
-      key={props.key}
-      label={model.getTabLabel()}
-      icon="database"
-      counter={queryRunnerState.queries.length}
-      active={props.active}
-      onChangeTab={props.onChangeTab}
-    />
   );
 }
