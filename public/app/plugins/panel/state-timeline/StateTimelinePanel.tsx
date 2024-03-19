@@ -4,6 +4,7 @@ import { CartesianCoords2D, DashboardCursorSync, DataFrame, FieldType, PanelProp
 import { getLastStreamingDataFramePacket } from '@grafana/data/src/dataframe/StreamingDataFrame';
 import { config } from '@grafana/runtime';
 import {
+  EventBusPlugin,
   Portal,
   TooltipDisplayMode,
   TooltipPlugin2,
@@ -14,7 +15,7 @@ import {
   ZoomPlugin,
 } from '@grafana/ui';
 import { addTooltipSupport, HoverEvent } from '@grafana/ui/src/components/uPlot/config/addTooltipSupport';
-import { TooltipHoverMode } from '@grafana/ui/src/components/uPlot/plugins/TooltipPlugin2';
+import { TimeRange2, TooltipHoverMode } from '@grafana/ui/src/components/uPlot/plugins/TooltipPlugin2';
 import { CloseButton } from 'app/core/components/CloseButton/CloseButton';
 import { TimelineChart } from 'app/core/components/TimelineChart/TimelineChart';
 import {
@@ -25,6 +26,7 @@ import {
 
 import { AnnotationEditorPlugin } from '../timeseries/plugins/AnnotationEditorPlugin';
 import { AnnotationsPlugin } from '../timeseries/plugins/AnnotationsPlugin';
+import { AnnotationsPlugin2 } from '../timeseries/plugins/AnnotationsPlugin2';
 import { OutsideRangePlugin } from '../timeseries/plugins/OutsideRangePlugin';
 import { getTimezones } from '../timeseries/utils';
 
@@ -51,6 +53,19 @@ export const StateTimelinePanel = ({
 }: TimelinePanelProps) => {
   const theme = useTheme2();
 
+  // TODO: we should just re-init when this changes, and have this be a static setting
+  const syncTooltip = useCallback(
+    () => sync?.() === DashboardCursorSync.Tooltip,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
+  const syncAny = useCallback(
+    () => sync?.() !== DashboardCursorSync.Off,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+
   const oldConfig = useRef<UPlotConfigBuilder | undefined>(undefined);
   const isToolTipOpen = useRef<boolean>(false);
 
@@ -60,7 +75,9 @@ export const StateTimelinePanel = ({
   const [focusedPointIdx, setFocusedPointIdx] = useState<number | null>(null);
   const [isActive, setIsActive] = useState<boolean>(false);
   const [shouldDisplayCloseButton, setShouldDisplayCloseButton] = useState<boolean>(false);
-  const { sync, canAddAnnotations } = usePanelContext();
+  // temp range set for adding new annotation set by TooltipPlugin2, consumed by AnnotationPlugin2
+  const [newAnnotationRange, setNewAnnotationRange] = useState<TimeRange2 | null>(null);
+  const { sync, canAddAnnotations, dataLinkPostProcessor, eventBus } = usePanelContext();
 
   const onCloseToolTip = () => {
     isToolTipOpen.current = false;
@@ -106,10 +123,7 @@ export const StateTimelinePanel = ({
        * Render nothing in this case to prevent error.
        * See https://github.com/grafana/support-escalations/issues/932
        */
-      if (
-        (!alignedData.meta?.transformations?.length && alignedData.fields.length - 1 !== valueFieldsCount) ||
-        !alignedData.fields[seriesIdx]
-      ) {
+      if (alignedData.fields.length - 1 !== valueFieldsCount || !alignedData.fields[seriesIdx]) {
         return null;
       }
 
@@ -163,6 +177,7 @@ export const StateTimelinePanel = ({
     }
   }
   const enableAnnotationCreation = Boolean(canAddAnnotations && canAddAnnotations());
+  const showNewVizTooltips = Boolean(config.featureToggles.newVizTooltips);
 
   return (
     <TimelineChart
@@ -176,9 +191,11 @@ export const StateTimelinePanel = ({
       legendItems={legendItems}
       {...options}
       mode={TimelineMode.Changes}
+      replaceVariables={replaceVariables}
+      dataLinkPostProcessor={dataLinkPostProcessor}
     >
       {(builder, alignedFrame) => {
-        if (oldConfig.current !== builder) {
+        if (oldConfig.current !== builder && !showNewVizTooltips) {
           oldConfig.current = addTooltipSupport({
             config: builder,
             onUPlotClick,
@@ -195,32 +212,65 @@ export const StateTimelinePanel = ({
 
         return (
           <>
-            {config.featureToggles.newVizTooltips ? (
+            <EventBusPlugin config={builder} sync={syncAny} eventBus={eventBus} frame={alignedFrame} />
+            {showNewVizTooltips ? (
               <>
                 {options.tooltip.mode !== TooltipDisplayMode.None && (
                   <TooltipPlugin2
                     config={builder}
-                    hoverMode={TooltipHoverMode.xOne}
+                    hoverMode={
+                      options.tooltip.mode === TooltipDisplayMode.Multi ? TooltipHoverMode.xAll : TooltipHoverMode.xOne
+                    }
                     queryZoom={onChangeTimeRange}
-                    render={(u, dataIdxs, seriesIdx, isPinned) => {
+                    syncTooltip={syncTooltip}
+                    render={(u, dataIdxs, seriesIdx, isPinned, dismiss, timeRange2, viaSync) => {
+                      if (enableAnnotationCreation && timeRange2 != null) {
+                        setNewAnnotationRange(timeRange2);
+                        dismiss();
+                        return;
+                      }
+
+                      const annotate = () => {
+                        let xVal = u.posToVal(u.cursor.left!, 'x');
+
+                        setNewAnnotationRange({ from: xVal, to: xVal });
+                        dismiss();
+                      };
+
                       return (
                         <StateTimelineTooltip2
-                          data={frames ?? []}
+                          frames={frames ?? []}
+                          seriesFrame={alignedFrame}
                           dataIdxs={dataIdxs}
-                          alignedData={alignedFrame}
                           seriesIdx={seriesIdx}
-                          timeZone={timeZone}
+                          mode={viaSync ? TooltipDisplayMode.Multi : options.tooltip.mode}
+                          sortOrder={options.tooltip.sort}
                           isPinned={isPinned}
+                          timeRange={timeRange}
+                          annotate={enableAnnotationCreation ? annotate : undefined}
+                          withDuration={true}
                         />
                       );
                     }}
+                    maxWidth={options.tooltip.maxWidth}
+                    maxHeight={options.tooltip.maxHeight}
                   />
                 )}
+                {/* Renders annotations */}
+                <AnnotationsPlugin2
+                  annotations={data.annotations ?? []}
+                  config={builder}
+                  timeZone={timeZone}
+                  newRange={newAnnotationRange}
+                  setNewRange={setNewAnnotationRange}
+                  canvasRegionRendering={false}
+                />
               </>
             ) : (
               <>
                 <ZoomPlugin config={builder} onZoom={onChangeTimeRange} />
                 <OutsideRangePlugin config={builder} onChangeTimeRange={onChangeTimeRange} />
+                {/* Renders annotation markers*/}
                 {data.annotations && (
                   <AnnotationsPlugin annotations={data.annotations} config={builder} timeZone={timeZone} />
                 )}

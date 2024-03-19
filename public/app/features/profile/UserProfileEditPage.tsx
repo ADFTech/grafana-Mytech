@@ -79,7 +79,6 @@ export function UserProfileEditPage({
   const extensionComponents = useMemo(() => {
     const { extensions } = getPluginComponentExtensions({
       extensionPointId: PluginExtensionPoints.UserProfileTab,
-      context: {},
     });
 
     return extensions;
@@ -126,7 +125,7 @@ export function UserProfileEditPage({
 
   const UserProfileWithTabs = () => (
     <div data-testid={selectors.components.UserProfile.extensionPointTabs}>
-      <VerticalGroup spacing="md">
+      <Stack direction="column" gap={2}>
         <TabsBar>
           {tabs.map(({ id, title }) => {
             return (
@@ -160,7 +159,7 @@ export function UserProfileEditPage({
             return null;
           })}
         </TabContent>
-      </VerticalGroup>
+      </Stack>
     </div>
   );
 
